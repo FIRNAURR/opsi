@@ -1,6 +1,7 @@
 import base64
 import copy
 import os
+import math
 import urllib.parse
 from datetime import datetime
 import streamlit as st
@@ -117,17 +118,36 @@ INITIAL_SPOTS = [
 ]
 
 # ------------------------------------------------------------------
-# INISIALISASI STATE
+# INISIALISASI STATE & URL PARAMS
 # ------------------------------------------------------------------
-if "view" not in st.session_state: st.session_state.view = "grid"
-if "selected" not in st.session_state: st.session_state.selected = INITIAL_SPOTS[0]["id"]
+if "view" not in st.session_state:
+    qp_view = st.query_params.get("view", "grid")
+    qp_spot = st.query_params.get("spot", INITIAL_SPOTS[0]["id"])
+    st.session_state.view = qp_view if qp_view in ("grid", "detail") else "grid"
+    st.session_state.selected = qp_spot
+
 if "is_admin" not in st.session_state: st.session_state.is_admin = False
 if "admin_name" not in st.session_state: st.session_state.admin_name = None
 if "show_login" not in st.session_state: st.session_state.show_login = False
 if "spots" not in st.session_state: st.session_state.spots = copy.deepcopy(INITIAL_SPOTS)
+if "trigger_locate" not in st.session_state: st.session_state.trigger_locate = False
 
 spots = st.session_state.spots
 spots_by_id = {s["id"]: s for s in spots}
+
+def _get_user_location() -> list | None:
+    lat_raw = st.query_params.get("lat")
+    lon_raw = st.query_params.get("lon")
+    if lat_raw and lon_raw:
+        try: return [float(lat_raw), float(lon_raw)]
+        except ValueError: return None
+    return None
+
+def _clear_user_location():
+    if "lat" in st.query_params: del st.query_params["lat"]
+    if "lon" in st.query_params: del st.query_params["lon"]
+    st.session_state.trigger_locate = False
+    st.rerun()
 
 # ------------------------------------------------------------------
 # STYLE CSS (Global & Admin)
@@ -206,17 +226,25 @@ if st.session_state.is_admin:
     """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------
-# HELPER FUNCTIONS
+# HELPER FUNCTIONS (Termasuk Rumus Bearing & GPS)
 # ------------------------------------------------------------------
 def image_to_data_uri(filename: str) -> str:
     if not filename: return ""
     path = os.path.join(ASSETS_DIR, filename)
     if not os.path.exists(path): return ""
-    with open(path, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode()
+    with open(path, "rb") as f: encoded = base64.b64encode(f.read()).decode()
     ext = filename.rsplit(".", 1)[-1].lower()
-    mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-    return f"data:image/{mime};base64,{encoded}"
+    return f"data:image/{'jpeg' if ext in ('jpg', 'jpeg') else ext};base64,{encoded}"
+
+def compute_bearing(coord1, coord2):
+    """Menghitung sudut (derajat) antara koordinat awal (GPS user) dan koordinat tujuan"""
+    lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
+    lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
+    dLon = lon2 - lon1
+    y = math.sin(dLon) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dLon)
+    brng = math.degrees(math.atan2(y, x))
+    return round((brng + 360) % 360)
 
 def bearing_to_label(deg: int) -> str:
     dirs = [("U", 0), ("TL", 45), ("T", 90), ("TG", 135), ("S", 180), ("BD", 225), ("B", 270), ("BL", 315)]
@@ -234,9 +262,7 @@ def compass_figure(bearing: int) -> go.Figure:
     )
     return fig
 
-AMENITY_ICONS = {
-    "resto": "🍽️", "mushola": "🕌", "fasilitas": "🚻"
-}
+AMENITY_ICONS = {"resto": "🍽️", "mushola": "🕌", "fasilitas": "🚻"}
 
 def amenity_card(title: str, items: list, kind: str):
     rows = ""
@@ -250,7 +276,6 @@ def amenity_card(title: str, items: list, kind: str):
             </form>
             """
         rows += f'<div class="ritam-item"><span>{name} {btn_delete}</span><span class="ritam-dist-pill {kind}">{dist}</span></div>'
-    
     st.markdown(f"""
         <div class="ritam-card">
           <div class="amen-head"><div class="amen-icon-circle {kind}">{AMENITY_ICONS[kind]}</div><h4>{title}</h4></div>
@@ -265,25 +290,26 @@ def parse_directions(steps):
         maneuver = step.get('maneuver', {})
         m_type = maneuver.get('type', '')
         m_mod = maneuver.get('modifier', 'lurus')
-        name = step.get('name', '')
-        street = name if name != '' else "jalan setapak/gang"
+        street = step.get('name', '') if step.get('name', '') != '' else "jalan setapak/gang"
         arah = m_mod.replace('left', 'kiri').replace('right', 'kanan').replace('straight', 'lurus').replace('slight', 'sedikit')
         
         if m_type == 'depart': txt = f"🚶 <b>Mulai:</b> Jalan {dist}m menuju {street}."
         elif m_type == 'arrive': txt = f"🏁 <b>Tiba</b> di area aman."
-        else:
-            txt = f"↪️ Belok <b>{arah}</b> ke {street}, lanjut {dist}m." if dist > 0 else f"↪️ Belok <b>{arah}</b> ke {street}."
+        else: txt = f"↪️ Belok <b>{arah}</b> ke {street}, lanjut {dist}m." if dist > 0 else f"↪️ Belok <b>{arah}</b> ke {street}."
         if dist > 0 or m_type == 'arrive': instructions.append(txt)
     return instructions
 
-def render_map_and_directions(spot_name, coords):
-    lon_s, lat_s = coords["start"][1], coords["start"][0]
-    lon_e, lat_e = coords["end"][1], coords["end"][0]
+def render_map_and_directions(start_coords, end_coords, safe_name, is_live_location=False):
+    lon_s, lat_s = start_coords[1], start_coords[0]
+    lon_e, lat_e = end_coords[1], end_coords[0]
     
     m = folium.Map(location=[(lat_s+lat_e)/2, (lon_s+lon_e)/2], zoom_start=15, tiles='OpenStreetMap')
-    folium.CircleMarker(coords["start"], radius=6, color='white', fill_color='#e6572a', fill_opacity=1, tooltip="Lokasi Anda").add_to(m)
-    folium.CircleMarker(coords["end"], radius=8, color='white', fill_color='#2c7a3f', fill_opacity=1, tooltip="Titik Kumpul").add_to(m)
-    folium.Circle(coords["end"], radius=60, color='#7fae67', fill_color='#7fae67', fill_opacity=0.3).add_to(m)
+    # Jika pakai Live Location, marker start bernama "Lokasi Anda (GPS)"
+    start_label = "Lokasi Anda (GPS)" if is_live_location else "Titik Acuan Wisata"
+    folium.CircleMarker(start_coords, radius=6, color='white', fill_color='#e6572a', fill_opacity=1, tooltip=start_label).add_to(m)
+    
+    folium.CircleMarker(end_coords, radius=8, color='white', fill_color='#2c7a3f', fill_opacity=1, popup=safe_name, tooltip="Titik Kumpul").add_to(m)
+    folium.Circle(end_coords, radius=60, color='#7fae67', fill_color='#7fae67', fill_opacity=0.3).add_to(m)
     
     url = f"http://router.project-osrm.org/route/v1/foot/{lon_s},{lat_s};{lon_e},{lat_e}?overview=full&geometries=geojson&steps=true"
     html_inst = ""
@@ -298,15 +324,12 @@ def render_map_and_directions(spot_name, coords):
             time_m = round(route["duration"] / 60)
             html_inst += f"<div style='background:#1d2f24; padding:10px; border-radius:8px; border:1px solid #7fae67; margin-top:10px;'><b style='color:#7fae67;'>Total Jarak:</b> {dist_m} meter <br><b style='color:#7fae67;'>Estimasi:</b> {time_m} menit jalan kaki</div>"
             html_inst += "<ul style='font-size:13px; color:#cfd6c6; margin-top:10px; padding-left:20px;'>"
-            for inst in parse_directions(route["legs"][0]["steps"]):
-                html_inst += f"<li style='margin-bottom:5px;'>{inst}</li>"
+            for inst in parse_directions(route["legs"][0]["steps"]): html_inst += f"<li style='margin-bottom:5px;'>{inst}</li>"
             html_inst += "</ul>"
-        else:
-            html_inst = "<p style='color:#e6572a; font-size:12px;'>Rute jalan kaki otomatis tidak ditemukan.</p>"
-    except Exception:
-        html_inst = "<p style='color:#e6572a; font-size:12px;'>Gagal mengambil rute navigasi dari satelit.</p>"
+        else: html_inst = "<p style='color:#e6572a; font-size:12px;'>Rute jalan kaki otomatis tidak ditemukan.</p>"
+    except Exception: html_inst = "<p style='color:#e6572a; font-size:12px;'>Gagal mengambil rute dari satelit.</p>"
     
-    m.fit_bounds([coords["start"], coords["end"]])
+    m.fit_bounds([start_coords, end_coords])
     return m._repr_html_(), html_inst
 
 # ------------------------------------------------------------------
@@ -314,17 +337,15 @@ def render_map_and_directions(spot_name, coords):
 # ------------------------------------------------------------------
 with st.container(key="ritam_topbar"):
     top_l, top_r = st.columns([3, 1], gap="small")
-    with top_l:
-        st.markdown('<div class="ritam-brand" style="margin-bottom:6px;"><div class="ritam-dot-ring"></div><span>RITAM</span></div>', unsafe_allow_html=True)
+    with top_l: st.markdown('<div class="ritam-brand" style="margin-bottom:6px;"><div class="ritam-dot-ring"></div><span>RITAM</span></div>', unsafe_allow_html=True)
     with top_r:
         st.markdown('<div class="ritam-admin-toggle" style="text-align:right;">', unsafe_allow_html=True)
         if st.session_state.is_admin:
-            if st.button(f"🔓 {st.session_state.admin_name}", key="admin_logout_btn"):
+            if st.button(f"🔓 Keluar", key="admin_logout_btn"):
                 st.session_state.is_admin, st.session_state.admin_name = False, None
                 st.rerun()
         else:
-            if st.button("🔒 Admin", key="admin_login_toggle"):
-                st.session_state.show_login = not st.session_state.show_login
+            if st.button("🔒 Admin", key="admin_login_toggle"): st.session_state.show_login = not st.session_state.show_login
         st.markdown('</div>', unsafe_allow_html=True)
 
 if st.session_state.show_login and not st.session_state.is_admin:
@@ -348,6 +369,10 @@ st.markdown('<div class="ritam-status" style="margin:-6px 0 14px;"><span class="
 if st.session_state.view == "grid":
     st.markdown('<div class="ritam-heading">Kesiapsiagaan Wisata <b>Kawasan Cikole</b> — pilih lokasi kamu</div>', unsafe_allow_html=True)
     st.write("")
+    
+    # Hapus URL query param jika di menu grid
+    if "spot" in st.query_params: del st.query_params["spot"]
+    if "view" in st.query_params: del st.query_params["view"]
 
     cols = st.columns(2)
     for i, spot in enumerate(spots):
@@ -369,6 +394,8 @@ if st.session_state.view == "grid":
             if st.button("✎ Kelola" if st.session_state.is_admin else "Lihat Evakuasi", key=f"btn_{spot['id']}"):
                 st.session_state.selected = spot["id"]
                 st.session_state.view = "detail"
+                st.query_params["view"] = "detail"
+                st.query_params["spot"] = spot["id"]
                 st.rerun()
 
     # CRUD ADMIN: Tambah Wisata Baru
@@ -378,7 +405,7 @@ if st.session_state.view == "grid":
             with st.form("add_spot_form"):
                 n_name = st.text_input("Nama Destinasi")
                 n_cat = st.text_input("Kategori", "Wisata Alam")
-                n_zone = st.selectbox("Zona Kerentanan", ["Zona Merah", "Zona Kuning", "Zona Hijau"])
+                n_zone = st.selectbox("Zona Kerentanan", ["Zona Merah", "Zona Kuning"])
                 col1, col2 = st.columns(2)
                 lat_s = col1.number_input("Latitude (Lokasi)", value=-6.8000, format="%.6f")
                 lon_s = col2.number_input("Longitude (Lokasi)", value=107.6300, format="%.6f")
@@ -388,25 +415,24 @@ if st.session_state.view == "grid":
                 
                 if st.form_submit_button("Simpan Destinasi"):
                     new_spot = {
-                        "id": f"spot_{len(spots)+1}", "name": n_name, "image": "",
-                        "category": n_cat, "zone": n_zone, "ticket": "-",
-                        "evac": {"point": n_safe, "bearing": 0, "dist": "-", "time": "-", "note": "Panduan evakuasi belum ditambahkan."},
+                        "id": f"spot_{len(spots)+1}", "name": n_name, "image": "", "category": n_cat, "zone": n_zone, "ticket": "-",
+                        "evac": {"point": n_safe, "bearing": 0, "dist": "-", "time": "-", "note": "Panduan belum ditambahkan."},
                         "coords": {"start": [lat_s, lon_s], "end": [lat_e, lon_e], "safe_name": n_safe},
-                        "amenities": {"resto": [], "mushola": [], "fasilitas": []},
-                        "social": {"instagram": "", "instagram_url": ""}
+                        "amenities": {"resto": [], "mushola": [], "fasilitas": []}, "social": {"instagram": "", "instagram_url": ""}
                     }
                     st.session_state.spots.append(new_spot)
                     st.success(f"{n_name} berhasil ditambahkan!")
                     st.rerun()
 
 # ------------------------------------------------------------------
-# VIEW 2: DETAIL EVAKUASI & CRUD LAYANAN
+# VIEW 2: DETAIL EVAKUASI & PELACAKAN LOKASI (GPS)
 # ------------------------------------------------------------------
 else:
-    spot = spots_by_id[st.session_state.selected]
+    spot = spots_by_id.get(st.session_state.selected, spots[0])
     st.markdown('<div class="ritam-back">', unsafe_allow_html=True)
     if st.button("← Kembali ke daftar", key="back_btn"):
         st.session_state.view = "grid"
+        _clear_user_location() # bersihkan koordinat gps saat kembali
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -420,22 +446,64 @@ else:
 
     tabs = st.tabs(["🧭 Evakuasi", "✅ SOP", "🍽️ Layanan", "⚙️ Admin"] if st.session_state.is_admin else ["🧭 Evakuasi", "✅ SOP", "🍽️ Layanan"])
 
-    # TAB 1: EVAKUASI
+    # TAB 1: EVAKUASI (Dengan Real-Time GPS Tracker)
     with tabs[0]:
+        user_loc = _get_user_location()
+        is_live = user_loc is not None
+        
+        # Logika: Jika user share location, kalkulasi ulang rute dan bearing kompas
+        start_coords = user_loc if is_live else spot["coords"]["start"]
+        dynamic_bearing = compute_bearing(start_coords, spot["coords"]["end"]) if is_live else spot["evac"]["bearing"]
+        dir_label = bearing_to_label(dynamic_bearing)
+
+        # 1. UI Kompas (Otomatis memutar ke arah GPS terbaru jika is_live)
         st.markdown('<div class="ritam-evac">', unsafe_allow_html=True)
-        st.markdown('<div class="ritam-eyebrow">Arah Evakuasi (Kompas)</div>', unsafe_allow_html=True)
-        st.plotly_chart(compass_figure(spot["evac"]["bearing"]), use_container_width=True, config={"displayModeBar": False})
-        st.markdown(f'<h3>{spot["evac"]["point"]}</h3>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ritam-eyebrow">{"Arah Evakuasi dari GPS Anda" if is_live else "Arah Evakuasi (Titik Acuan Wisata)"}</div>', unsafe_allow_html=True)
+        st.plotly_chart(compass_figure(dynamic_bearing), use_container_width=True, config={"displayModeBar": False})
+        st.markdown(f'<h3>{spot["coords"]["safe_name"]}</h3>', unsafe_allow_html=True)
         st.markdown(f"""
             <div class="ritam-meta-row">
-              <div>Arah<b>{bearing_to_label(spot["evac"]["bearing"])} ({spot["evac"]["bearing"]}°)</b></div>
+              <div>Arah<b>{dir_label} ({dynamic_bearing}°)</b></div>
             </div>
             <div class="ritam-note">{spot["evac"]["note"]}</div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="ritam-eyebrow" style="margin-top:15px;">Peta Navigasi OpenStreetMap</div>', unsafe_allow_html=True)
-        map_html, inst_html = render_map_and_directions(spot["name"], spot["coords"])
+        # 2. Tombol Deteksi Lokasi
+        st.write("")
+        if is_live:
+            st.markdown('<div class="ritam-admin-badge" style="color:#7fae67; border-color:#7fae67; background:rgba(127,174,103,0.12);">📍 Rute dihitung dari lokasi GPS Anda saat ini</div>', unsafe_allow_html=True)
+            if st.button("↺ Matikan Lokasi Saya"):
+                _clear_user_location()
+        else:
+            # Inject Script untuk meminta izin GPS HP
+            if st.button("📍 Gunakan lokasi GPS saya"):
+                st.session_state.trigger_locate = True
+
+            if st.session_state.trigger_locate:
+                # Script HTML & JS untuk fetch Geolocation lalu lempar ke URL Parameter Streamlit
+                st.components.v1.html("""
+                    <script>
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(function(position) {
+                            var lat = position.coords.latitude;
+                            var lon = position.coords.longitude;
+                            var url = new URL(window.parent.location.href);
+                            url.searchParams.set('lat', lat);
+                            url.searchParams.set('lon', lon);
+                            window.parent.location.href = url.href;
+                        }, function(error) {
+                            alert("Akses lokasi ditolak atau gagal. Pastikan GPS HP Anda menyala.");
+                        });
+                    } else {
+                        alert("Browser Anda tidak mendukung Geolocation.");
+                    }
+                    </script>
+                """, height=0)
+
+        # 3. Peta Navigasi OpenStreetMap
+        st.markdown('<div class="ritam-eyebrow" style="margin-top:15px;">Peta Navigasi Otomatis (OSRM)</div>', unsafe_allow_html=True)
+        map_html, inst_html = render_map_and_directions(start_coords, spot["coords"]["end"], spot["coords"]["safe_name"], is_live)
         components.html(map_html, height=350)
         st.markdown(inst_html, unsafe_allow_html=True)
 
@@ -444,7 +512,7 @@ else:
         steps = [
             ("Lindungi diri", "Jauhi kaca dan tebing tinggi. Lindungi kepala."),
             ("Tetap tenang", "Ikuti arah petunjuk staf & peta RITAM."),
-            ("Menuju titik kumpul", "Gunakan jalur jalan kaki untuk menghindari macet kendaraan."),
+            ("Menuju titik kumpul", "Gunakan jalur jalan kaki (GPS) untuk menghindari macet kendaraan."),
             ("Tunggu instruksi", "Tetap di titik aman hingga instruksi dari BPBD."),
         ]
         for i, (l, t) in enumerate(steps, start=1):
@@ -471,13 +539,14 @@ else:
                         st.rerun()
 
             st.divider()
-            st.subheader("🧭 Edit Info Evakuasi")
+            st.subheader("🧭 Edit Info Evakuasi (Acuan)")
             with st.form(f"edit_evac_{spot['id']}"):
-                n_point = st.text_input("Nama titik kumpul", value=spot["evac"]["point"])
-                n_bearing = st.slider("Arah Kompas (Derajat)", 0, 359, spot["evac"]["bearing"])
+                n_safe = st.text_input("Nama titik kumpul", value=spot["coords"]["safe_name"])
+                n_bearing = st.slider("Arah Kompas Bawaan (Derajat)", 0, 359, spot["evac"]["bearing"])
                 n_note = st.text_area("Catatan / Arahan", value=spot["evac"]["note"])
-                if st.form_submit_button("💾 Simpan Evakuasi"):
-                    spot["evac"]["point"] = n_point
+                if st.form_submit_button("💾 Simpan Perubahan"):
+                    spot["coords"]["safe_name"] = n_safe
+                    spot["evac"]["point"] = n_safe
                     spot["evac"]["bearing"] = n_bearing
                     spot["evac"]["note"] = n_note
                     st.success("Tersimpan!")
