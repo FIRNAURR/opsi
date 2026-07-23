@@ -22,6 +22,8 @@ traceback ke pengguna:
      st.toast/pesan yang sesuai tanpa perlu mem-parsing HTML.
 """
 
+import math
+
 import folium
 import requests
 import streamlit as st
@@ -39,6 +41,26 @@ def bearing_to_label(deg: int) -> str:
     return DIR_LABEL[closest[0]]
 
 
+def compute_bearing(start_coords: list, end_coords: list) -> int:
+    """
+    Menghitung bearing (arah kompas awal, derajat 0-359) dari start_coords
+    menuju end_coords memakai rumus forward azimuth pada bola bumi.
+
+    Dipakai saat start_coords berasal dari GPS pengguna secara langsung
+    (bukan titik acuan statis milik lokasi wisata) — agar arah kompas
+    yang ditampilkan selalu akurat terhadap posisi nyata pengguna,
+    persis seperti panah arah pada Google Maps.
+    """
+    lat1, lon1 = math.radians(start_coords[0]), math.radians(start_coords[1])
+    lat2, lon2 = math.radians(end_coords[0]), math.radians(end_coords[1])
+    dlon = lon2 - lon1
+
+    x = math.sin(dlon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+    bearing = math.degrees(math.atan2(x, y))
+    return round((bearing + 360) % 360)
+
+
 def parse_directions(steps: list) -> list:
     """Mengubah langkah mentah (steps) dari respons OSRM menjadi kalimat instruksi."""
     instructions = []
@@ -50,11 +72,16 @@ def parse_directions(steps: list) -> list:
         name = step.get("name", "")
 
         street = name if name != "" else "jalan setapak/gang"
+        # Modifier mentah dari OSRM: straight, slight left/right, left/right,
+        # sharp left/right, uturn. Seluruh kombinasi diterjemahkan di sini
+        # agar tidak ada kata berbahasa Inggris yang lolos ke instruksi.
         arah = (
-            m_mod.replace("left", "kiri")
-            .replace("right", "kanan")
-            .replace("straight", "lurus")
+            m_mod.replace("sharp", "tajam")
             .replace("slight", "sedikit")
+            .replace("straight", "lurus")
+            .replace("uturn", "putar balik")
+            .replace("left", "kiri")
+            .replace("right", "kanan")
         )
 
         if m_type == "depart":
