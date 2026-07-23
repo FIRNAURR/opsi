@@ -18,11 +18,10 @@ import copy
 from datetime import datetime
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 import config
 from data import SPOTS, SPOTS_BY_ID
-from utils.map_helpers import bearing_to_label, generate_evac_map_and_instructions
+from utils.map_helpers import bearing_to_label, compute_bearing, generate_evac_map_and_instructions
 from components import ui
 
 # ------------------------------------------------------------------
@@ -68,6 +67,34 @@ def _go_to_grid() -> None:
     st.query_params["view"] = "grid"
     if "spot" in st.query_params:
         del st.query_params["spot"]
+    st.rerun()
+
+
+def _get_user_location() -> list | None:
+    """
+    Membaca koordinat GPS pengguna dari query params (?lat=..&lon=..)
+    yang disisipkan oleh tombol "Gunakan lokasi saya" (lihat
+    components/ui.py -> render_locate_me_widget). Mengembalikan None
+    dan aman terhadap nilai rusak/tidak valid — tidak pernah melempar
+    exception ke pemanggil.
+    """
+    lat_raw = st.query_params.get("lat")
+    lon_raw = st.query_params.get("lon")
+    if lat_raw is None or lon_raw is None:
+        return None
+    try:
+        lat, lon = float(lat_raw), float(lon_raw)
+    except (TypeError, ValueError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return [lat, lon]
+
+
+def _clear_user_location() -> None:
+    for key in ("lat", "lon"):
+        if key in st.query_params:
+            del st.query_params[key]
     st.rerun()
 
 
@@ -153,19 +180,29 @@ else:
 
     # ---------------- TAB: EVAKUASI ----------------
     with tab_evac:
-        dir_label = bearing_to_label(spot["evac"]["bearing"])
+        user_location = _get_user_location()
+        using_live_location = user_location is not None
+        start_coords = user_location if using_live_location else spot["coords"]["start"]
+        bearing = (
+            compute_bearing(start_coords, spot["coords"]["end"])
+            if using_live_location
+            else spot["evac"]["bearing"]
+        )
+        dir_label = bearing_to_label(bearing)
+
         st.markdown('<div class="ritam-evac">', unsafe_allow_html=True)
-        st.markdown('<div class="ritam-eyebrow">Arah Evakuasi Terdekat</div>', unsafe_allow_html=True)
+        eyebrow = "Arah Evakuasi dari Lokasi Anda" if using_live_location else "Arah Evakuasi Terdekat"
+        st.markdown(f'<div class="ritam-eyebrow">{eyebrow}</div>', unsafe_allow_html=True)
         st.plotly_chart(
-            ui.compass_figure(spot["evac"]["bearing"]),
-            use_container_width=True,
+            ui.compass_figure(bearing),
+            width="stretch",
             config={"displayModeBar": False},
         )
         st.markdown(f'<h3>{spot["coords"]["safe_name"]}</h3>', unsafe_allow_html=True)
         st.markdown(
             f"""
             <div class="ritam-meta-row">
-              <div>Arah<b>{dir_label} ({spot["evac"]["bearing"]}°)</b></div>
+              <div>Arah<b>{dir_label} ({bearing}°)</b></div>
             </div>
             <div class="ritam-note">{spot["evac"]["note"]}</div>
             """,
@@ -173,22 +210,48 @@ else:
         )
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # ---- Titik awal: lokasi GPS pengguna (mode "Google Maps") vs
+        #      titik acuan statis lokasi wisata (mode ilustratif bawaan) ----
+        if using_live_location:
+            st.markdown(
+                '<div class="ritam-admin-badge" style="color:var(--ritam-success);'
+                'border-color:rgba(var(--ritam-success-rgb),0.4);'
+                'background:rgba(var(--ritam-success-rgb),0.12);">'
+                '📍 Rute &amp; arah dihitung dari lokasi Anda saat ini</div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("↺ Pakai titik acuan bawaan lokasi wisata", key="reset_geo_location"):
+                _clear_user_location()
+        else:
+            st.caption(
+                "Arah di atas adalah estimasi dari titik acuan resmi lokasi wisata. "
+                "Aktifkan lokasi Anda untuk arah & rute real-time dari posisi Anda sekarang."
+            )
+            ui.render_locate_me_widget()
+
         st.markdown('<div class="ritam-eyebrow" style="margin-bottom:8px;">Peta Rute Evakuasi</div>', unsafe_allow_html=True)
 
         # generate_evac_map_and_instructions sudah menangani seluruh
         # kegagalan OSRM secara internal (lihat utils/map_helpers.py) dan
         # tidak pernah melempar exception ke sini. `status` dipakai murni
         # untuk memberi tahu pengguna lewat toast, bukan untuk logika alur.
+        # Saat mode lokasi live aktif, start_coords adalah GPS pengguna —
+        # sehingga cache rute otomatis unik per koordinat, bukan per spot.
         map_html, instructions_html, status = generate_evac_map_and_instructions(
-            spot["name"], spot["coords"]["start"], spot["coords"]["end"], spot["coords"]["safe_name"]
+            spot["name"], start_coords, spot["coords"]["end"], spot["coords"]["safe_name"]
         )
         if status == "fallback":
             st.toast("Server navigasi sedang bermasalah — memakai estimasi arah garis lurus.", icon="📡")
         elif status == "no_route":
             st.toast("Rute pejalan kaki otomatis tidak ditemukan untuk lokasi ini.", icon="🧭")
 
-        components.html(map_html, height=350)
-        st.markdown(instructions_html, unsafe_allow_html=True)
+        # map_html & instructions_html dibangkitkan sepenuhnya dari data
+        # internal (koordinat + respons OSRM), bukan input mentah dari
+        # pengguna, sehingga aman dirender lewat st.iframe/st.html.
+        # st.html dipakai (bukan st.markdown) agar markup panjang & indentasi
+        # tidak pernah salah ditafsir sebagai blok kode oleh parser Markdown.
+        st.iframe(map_html, height=350)
+        st.html(instructions_html)
 
     # ---------------- TAB: SOP ----------------
     with tab_sop:
