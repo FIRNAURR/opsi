@@ -28,7 +28,7 @@ except Exception:
     ADMIN_USERS = {"admin": "kayaraya2026"}
 
 # ------------------------------------------------------------------
-# DATA AWAL (Termasuk Koordinat Presisi untuk Map)
+# DATA AWAL (6 Titik Wisata Lengkap dengan Koordinat Presisi)
 # ------------------------------------------------------------------
 DIR_LABEL = {
     "U": "Utara", "TL": "Timur Laut", "T": "Timur", "TG": "Tenggara",
@@ -43,9 +43,9 @@ INITIAL_SPOTS = [
                  "note": "Jauhi jembatan gantung dan area pepohonan tinggi. Menuju rest area yang lebih terbuka."},
         "coords": {"start": [-6.780613, 107.637505], "end": [-6.789125, 107.644133], "safe_name": "Rest Area Cikole"},
         "amenities": {
-            "resto": [("Kedai kuliner Rabbit Forest", "T · 90 m", None)],
+            "resto": [("Kedai kuliner Rabbit Forest", "T · 90 m", None), ("Golden Pine Cafe", "TL · 140 m", None)],
             "mushola": [("Mushola dekat loket masuk", "B · 60 m", None)],
-            "fasilitas": [("Toilet umum area parkir", "B · 70 m", None)],
+            "fasilitas": [("Toilet umum area parkir", "B · 70 m", None), ("Pos informasi & P3K", "T · 100 m", None)],
         },
         "social": {"instagram": "@orchidforestcikole", "instagram_url": "https://www.instagram.com/orchidforestcikole/"},
     },
@@ -56,9 +56,9 @@ INITIAL_SPOTS = [
                  "note": "Segera menjauh dari pohon pinus tinggi. Lapangan Jayagiri menjadi titik kumpul terluas."},
         "coords": {"start": [-6.786551, 107.650482], "end": [-6.793284, 107.647901], "safe_name": "Lapangan Jayagiri Cikole"},
         "amenities": {
-            "resto": [("Restoran Sangkuriang", "TG · 130 m", None)],
+            "resto": [("Restoran Sangkuriang", "TG · 130 m", None), ("Saung Pengkolan 2", "T · 80 m", None)],
             "mushola": [("Mushola dekat camping ground", "BD · 150 m", None)],
-            "fasilitas": [("Pos keamanan", "BD · 60 m", None)],
+            "fasilitas": [("Toilet & kamar bilas", "T · 90 m", None), ("Pos keamanan", "BD · 60 m", None)],
         },
         "social": {"instagram": "@officialgrafika", "instagram_url": "https://www.instagram.com/officialgrafika/"},
     },
@@ -69,11 +69,50 @@ INITIAL_SPOTS = [
                  "note": "Jauhi tepi danau. Arahkan pengunjung ke Stadion Bentang yang bebas dari struktur perahu."},
         "coords": {"start": [-6.817521, 107.618640], "end": [-6.817183, 107.616553], "safe_name": "Stadion Bentang"},
         "amenities": {
-            "resto": [("Perahu kuliner Sunda", "T · 40 m", None)],
+            "resto": [("Perahu kuliner Sunda", "T · 40 m", None), ("Zona jajanan internasional", "TL · 100 m", None)],
             "mushola": [("Mushola dekat pintu masuk", "B · 90 m", None)],
-            "fasilitas": [("Loket & pos informasi", "B · 50 m", None)],
+            "fasilitas": [("Toilet area playground", "TG · 70 m", None), ("Loket & pos informasi", "B · 50 m", None)],
         },
         "social": {"instagram": "@floating.market.lembang", "instagram_url": "https://www.instagram.com/floating.market.lembang/"},
+    },
+    {
+        "id": "asiaafrika", "name": "The Great Asia Afrika", "image": "asiaafrika.jpg",
+        "category": "Wisata Tematik & Kuliner", "zone": "Zona Kuning", "ticket": "Rp30.000 – Rp50.000",
+        "evac": {"point": "Lapangan Terbuka Gudangkahuripan", "bearing": 15, "dist": "450 m", "time": "≈6 mnt",
+                 "note": "Hindari berlindung di dalam replika bangunan. Menuju lapangan terbuka yang berjarak paling dekat."},
+        "coords": {"start": [-6.833157, 107.602738], "end": [-6.829141, 107.605330], "safe_name": "Lapangan Terbuka Gudangkahuripan"},
+        "amenities": {
+            "resto": [("Kuliner Zona Korea & Jepang", "TL · 120 m", None), ("Kuliner Zona Afrika", "T · 160 m", None)],
+            "mushola": [("Mushola dekat Zona Indonesia", "B · 80 m", None)],
+            "fasilitas": [("Toilet Zona India", "TG · 100 m", None), ("Pos keamanan pintu masuk", "BD · 60 m", None)],
+        },
+        "social": {"instagram": "@thegreatasiaafricalembang", "instagram_url": "https://www.instagram.com/thegreatasiaafricalembang/"},
+    },
+    {
+        "id": "pineforest", "name": "Pine Forest Camp Lembang", "image": "pineforest.jpg",
+        "category": "Wisata Camping & Alam", "zone": "Zona Merah", "ticket": "Rp20.000 – Rp50.000",
+        "evac": {"point": "Lapangan Desa Cibodas", "bearing": 190, "dist": "1.1 km", "time": "≈15 mnt",
+                 "note": "Jauhi tepi jurang dan pohon pinus condong. Bergerak ke arah lapangan desa."},
+        "coords": {"start": [-6.819036, 107.665377], "end": [-6.825211, 107.657512], "safe_name": "Lapangan Desa Cibodas"},
+        "amenities": {
+            "resto": [("Warung makan area camping", "T · 100 m", None), ("Kedai kopi & jajanan", "TG · 70 m", None)],
+            "mushola": [("Mushola sederhana dekat gerbang", "BD · 130 m", None)],
+            "fasilitas": [("Toilet & kamar mandi umum", "T · 90 m", None), ("Pos ranger / pengelola", "B · 50 m", None)],
+        },
+        "social": {"instagram": "@pineforestcamplembang", "instagram_url": "https://www.instagram.com/pineforestcamplembang/"},
+    },
+    {
+        "id": "deranch", "name": "De Ranch Lembang", "image": "deranch.jpg",
+        "category": "Wisata Edukasi & Keluarga", "zone": "Zona Kuning", "ticket": "Rp30.000",
+        "evac": {"point": "Lapangan Terbuka Seskoau", "bearing": 300, "dist": "800 m", "time": "≈10 mnt",
+                 "note": "Jauhi kandang hewan dan pagar kayu saat evakuasi. Arahkan ke lapangan rumput asrama Seskoau."},
+        "coords": {"start": [-6.813915, 107.621255], "end": [-6.808535, 107.623588], "safe_name": "Lapangan Terbuka Seskoau"},
+        "amenities": {
+            "resto": [("Kedai susu & jajanan khas", "T · 60 m", None), ("Warung makan area piknik", "TL · 110 m", None)],
+            "mushola": [("Mushola dekat pintu masuk", "B · 70 m", None)],
+            "fasilitas": [("Toilet umum", "TG · 80 m", None), ("Pos informasi wahana", "B · 40 m", None)],
+        },
+        "social": {"instagram": "@deranchlembang", "instagram_url": "https://www.instagram.com/deranchlembang/"},
     }
 ]
 
