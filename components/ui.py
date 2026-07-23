@@ -246,6 +246,79 @@ def render_status_bar(is_admin: bool, admin_name: str | None) -> None:
         )
 
 
+def render_locate_me_widget() -> None:
+    """
+    Tombol "Gunakan lokasi saya" — meminta izin GPS browser lalu
+    mengarahkan ulang halaman dengan koordinat pengguna disisipkan ke
+    query params (?lat=..&lon=..), sehingga main.py bisa memakainya
+    sebagai titik awal rute. Ini yang membuat pengalamannya mirip
+    Google Maps: arah & rute dihitung dari posisi asli pengguna menuju
+    titik kumpul, bukan dari titik acuan statis milik lokasi wisata.
+
+    Dipakai lewat st.html (bukan st.markdown), karena dua alasan:
+      1. st.html merender langsung ke DOM utama halaman (tidak di
+         dalam iframe seperti st.components.v1.html), sehingga
+         Permissions-Policy browser tidak memblokir
+         navigator.geolocation.
+      2. st.markdown men-sanitasi/menghapus tag <script> walau
+         unsafe_allow_html=True — JS di dalamnya tidak akan pernah
+         benar-benar berjalan.
+
+    CATATAN: Geolocation API browser mensyaratkan "secure context"
+    (HTTPS atau localhost). Di hosting tanpa HTTPS, tombol ini akan
+    selalu gagal meminta izin — itu keterbatasan browser, bukan bug
+    aplikasi.
+    """
+    st.html(
+        """
+        <div style="margin-bottom:14px;">
+          <button id="ritam-geo-btn" type="button" style="
+              width:100%; background:rgba(var(--ritam-accent-rgb),0.14);
+              border:1px solid rgba(var(--ritam-accent-rgb),0.4); color:var(--ritam-accent);
+              font-size:12.5px; font-weight:600; padding:10px; border-radius:10px;
+              cursor:pointer; font-family:'Trebuchet MS',sans-serif;">
+            📍 Gunakan lokasi saya sebagai titik awal
+          </button>
+          <div id="ritam-geo-msg" style="font-size:11px; color:var(--ritam-text-dim); margin-top:6px; text-align:center;"></div>
+        </div>
+        <script>
+        (function () {
+          var btn = document.getElementById('ritam-geo-btn');
+          var msg = document.getElementById('ritam-geo-msg');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            if (!('geolocation' in navigator)) {
+              msg.textContent = 'Perangkat/browser ini tidak mendukung layanan lokasi.';
+              return;
+            }
+            btn.disabled = true;
+            btn.textContent = '📡 Mencari lokasi Anda...';
+            navigator.geolocation.getCurrentPosition(
+              function (pos) {
+                var url = new URL(window.location.href);
+                url.searchParams.set('lat', pos.coords.latitude);
+                url.searchParams.set('lon', pos.coords.longitude);
+                window.location.href = url.toString();
+              },
+              function (err) {
+                btn.disabled = false;
+                btn.textContent = '📍 Gunakan lokasi saya sebagai titik awal';
+                var text = 'Gagal mengambil lokasi.';
+                if (err.code === 1) text = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser.';
+                else if (err.code === 2) text = 'Posisi tidak tersedia. Pastikan GPS/layanan lokasi perangkat aktif.';
+                else if (err.code === 3) text = 'Permintaan lokasi melebihi batas waktu, coba lagi.';
+                msg.textContent = text;
+              },
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+          });
+        })();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
+
+
 def render_admin_login_form(auth_available: bool):
     """
     Merender kotak login admin.
