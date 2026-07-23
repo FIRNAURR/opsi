@@ -138,10 +138,15 @@ spots_by_id = {s["id"]: s for s in spots}
 def _get_user_location() -> list | None:
     lat_raw = st.query_params.get("lat")
     lon_raw = st.query_params.get("lon")
-    if lat_raw and lon_raw:
-        try: return [float(lat_raw), float(lon_raw)]
-        except ValueError: return None
-    return None
+    if lat_raw is None or lon_raw is None:
+        return None
+    try:
+        lat, lon = float(lat_raw), float(lon_raw)
+    except (TypeError, ValueError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return [lat, lon]
 
 def _clear_user_location():
     if "lat" in st.query_params: del st.query_params["lat"]
