@@ -108,7 +108,7 @@ def _build_base_map(start_coords, end_coords, spot_name, safe_name):
             (start_coords[1] + end_coords[1]) / 2,
         ],
         zoom_start=15,
-        tiles="CartoDB dark_matter",
+        tiles="OpenStreetMap",
     )
     folium.CircleMarker(
         location=start_coords, radius=6, color="white", weight=1.5, fill=True,
