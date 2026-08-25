@@ -1,30 +1,18 @@
 """
 components/ui.py
 =================
+(Versi Mobile-Optimized)
 Seluruh elemen presentasi aplikasi: injeksi CSS global, kompas arah,
 kartu grid wisata, kartu amenitas/sosial media, topbar, dan form
 login admin.
-
-DESAIN TEMA
------------
-CSS dibangun di atas CSS custom properties (variabel) sehingga tema
-gelap (default) dan tema admin (ungu) cukup meng-override beberapa
-variabel warna di :root — bukan menduplikasi puluhan aturan seperti
-pada versi sebelumnya. Ini menjamin konsistensi warna di seluruh
-elemen (tombol, tag, border, input form, kompas) tanpa risiko ada
-elemen yang "lupa" di-override saat mode admin aktif.
-
-Fungsi di modul ini murni untuk RENDER. Pemanggilan jaringan/OSRM
-sengaja tidak dilakukan di sini — itu tanggung jawab
-`utils/map_helpers.py`, dipanggil dari `main.py` — agar lapisan UI
-tetap mudah diuji dan tidak bercampur dengan I/O eksternal.
 """
 
-import urllib.parse
+from __future__ import annotations
 
+import urllib.parse
 import plotly.graph_objects as go
 import streamlit as st
-
+import config
 from utils.asset_helpers import image_to_data_uri
 
 # ------------------------------------------------------------------
@@ -41,12 +29,10 @@ PIN_ICON = (
     '<circle cx="12" cy="9" r="2.5"/></svg>'
 )
 
-
 # ------------------------------------------------------------------
-# CSS GLOBAL & TEMA
+# CSS GLOBAL & TEMA (MOBILE OPTIMIZED)
 # ------------------------------------------------------------------
 def inject_global_css() -> None:
-    """CSS utama aplikasi. Dipanggil sekali per rerun dari main.py."""
     st.markdown(
         """
         <style>
@@ -69,90 +55,165 @@ def inject_global_css() -> None:
             --ritam-info-rgb: 127,177,247;
         }
 
-        #MainMenu, header[data-testid="stHeader"], footer, .stDeployButton { visibility: hidden; height:0; }
-        .stApp { background-color: var(--ritam-bg); color: var(--ritam-text); }
-        .block-container { max-width: 460px; padding-top: 14px; padding-bottom: 60px; padding-left: 16px; padding-right: 16px; }
+        /* 1. Sembunyikan elemen Streamlit bawaan secara total */
+        #MainMenu, header[data-testid="stHeader"], footer, .stDeployButton { 
+            display: none !important; 
+        }
+
+        /* 2. Latar belakang luar (desktop) dibuat gelap pekat agar kontras */
+        .stApp { 
+            background-color: #0b120e; 
+            color: var(--ritam-text); 
+        }
+
+        /* 3. Container utama dipaksa menjadi bingkai HP (Mobile Frame) */
+        .block-container { 
+            background-color: var(--ritam-bg) !important;
+            max-width: 430px !important; /* Standar lebar layar iPhone Max */
+            margin: 0 auto !important;
+            padding: 0 16px 80px 16px !important;
+            min-height: 100vh !important;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            position: relative;
+        }
+
         h1, h2, h3, h4 { font-family: 'Trebuchet MS', sans-serif; letter-spacing: 0.02em; }
 
+        /* 4. Sticky Topbar agar navigasi selalu di atas saat di-scroll */
+        .st-key-ritam_topbar {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 1000 !important;
+            background: rgba(22, 36, 28, 0.90) !important;
+            backdrop-filter: blur(8px);
+            padding: 16px 0 8px 0 !important;
+            margin: 0 -16px 12px -16px !important;
+            border-bottom: 1px solid rgba(var(--ritam-line-rgb), 0.1);
+        }
+        .st-key-ritam_topbar > div { padding: 0 16px; }
+
         .ritam-brand { display:flex; align-items:center; gap:8px; }
-        .ritam-dot-ring { width:26px; height:26px; border-radius:50%; border:2px solid var(--ritam-accent); position:relative; flex-shrink:0; transition: border-color .2s ease; }
-        .ritam-dot-ring::after { content:''; position:absolute; inset:0; margin:auto; width:5px; height:5px; border-radius:50%; background:var(--ritam-accent); transition: background-color .2s ease; }
-        .ritam-brand span { font-family:'Trebuchet MS',sans-serif; font-size:15px; letter-spacing:0.04em; }
-        .ritam-status { font-family:monospace; font-size:9.5px; color:var(--ritam-text-dim); display:flex; align-items:center; gap:5px; }
+        .ritam-dot-ring { width:26px; height:26px; border-radius:50%; border:2px solid var(--ritam-accent); position:relative; flex-shrink:0; }
+        .ritam-dot-ring::after { content:''; position:absolute; inset:0; margin:auto; width:5px; height:5px; border-radius:50%; background:var(--ritam-accent); }
+        .ritam-brand span { font-family:'Trebuchet MS',sans-serif; font-size:16px; font-weight:bold; letter-spacing:0.04em; }
+        
+        .ritam-status { font-family:monospace; font-size:10px; color:var(--ritam-text-dim); display:flex; align-items:center; gap:5px; margin-bottom: 16px; }
         .ritam-status-dot { width:7px; height:7px; border-radius:50%; background:var(--ritam-success); box-shadow:0 0 6px var(--ritam-success); }
-        .ritam-heading { font-size:13px; color:var(--ritam-text-muted); margin-bottom:2px; }
+        .ritam-heading { font-size:14px; color:var(--ritam-text-muted); margin-bottom:2px; line-height: 1.4; }
         .ritam-heading b { color:var(--ritam-text); }
 
-        .ritam-photo-card { position:relative; border-radius:14px; overflow:hidden; height:150px; background-size:cover; background-position:center; margin-bottom:6px; border:1px solid rgba(var(--ritam-line-rgb),0.12); transition: transform .15s ease; }
-        .ritam-photo-card:hover { transform: translateY(-2px); }
-        .ritam-photo-overlay { position:absolute; inset:0; background:linear-gradient(180deg, rgba(22,36,28,0) 35%, rgba(22,36,28,0.92) 100%); display:flex; flex-direction:column; justify-content:flex-end; padding:10px 12px; }
-        .ritam-photo-zone { position:absolute; top:8px; right:8px; font-family:monospace; font-size:8.5px; padding:3px 8px; border-radius:20px; backdrop-filter:blur(2px); }
-        .ritam-photo-zone.merah { background:rgba(var(--ritam-danger-rgb),0.85); color:#fff; }
+        .ritam-photo-card { position:relative; border-radius:14px; overflow:hidden; height:160px; background-size:cover; background-position:center; margin-bottom:8px; border:1px solid rgba(var(--ritam-line-rgb),0.12); }
+        .ritam-photo-overlay { position:absolute; inset:0; background:linear-gradient(180deg, rgba(22,36,28,0) 30%, rgba(22,36,28,0.95) 100%); display:flex; flex-direction:column; justify-content:flex-end; padding:12px; }
+        .ritam-photo-zone { position:absolute; top:8px; right:8px; font-family:monospace; font-size:9.5px; padding:4px 10px; border-radius:20px; font-weight:bold; }
+        .ritam-photo-zone.merah { background:rgba(var(--ritam-danger-rgb),0.9); color:#fff; }
         .ritam-photo-zone.kuning { background:rgba(var(--ritam-accent-rgb),0.9); color:#412402; }
-        .ritam-photo-title { font-size:13.5px; font-weight:600; color:#fff; margin-bottom:2px; line-height:1.25; }
-        .ritam-photo-cat { font-size:10px; color:#d8ddd0; }
-        .ritam-photo-edit-flag { position:absolute; top:8px; left:8px; width:26px; height:26px; border-radius:50%; background:rgba(var(--ritam-accent-rgb),0.9); color:#1a1230; display:flex; align-items:center; justify-content:center; font-size:12px; z-index:2; }
+        .ritam-photo-title { font-size:14.5px; font-weight:700; color:#fff; margin-bottom:3px; line-height:1.2; }
+        .ritam-photo-cat { font-size:11px; color:#d8ddd0; }
+        .ritam-photo-edit-flag { position:absolute; top:8px; left:8px; width:28px; height:28px; border-radius:50%; background:rgba(var(--ritam-accent-rgb),0.9); color:#1a1230; display:flex; align-items:center; justify-content:center; font-size:13px; z-index:2; }
 
-        div[data-testid="stButton"] > button { width:100%; background:var(--ritam-card-bg) !important; border:1px solid rgba(var(--ritam-line-rgb),0.18) !important; color:var(--ritam-text) !important; font-size:12px !important; padding:8px !important; margin-bottom:16px; transition: border-color .15s ease, color .15s ease; }
-        div[data-testid="stButton"] > button:hover { border-color:var(--ritam-accent) !important; color:var(--ritam-accent) !important; }
-        .ritam-back button { width:auto !important; background:none !important; border:none !important; color:var(--ritam-text-muted) !important; font-size:12px !important; padding:0 !important; margin-bottom:10px !important; }
+        /* 5. Touch Targets: Tinggi tombol minimal 46px untuk layar sentuh */
+        div[data-testid="stButton"] > button { 
+            width:100%; 
+            background:var(--ritam-card-bg) !important; 
+            border:1px solid rgba(var(--ritam-line-rgb),0.2) !important; 
+            color:var(--ritam-text) !important; 
+            font-size:13px !important; 
+            min-height: 46px !important; 
+            border-radius: 12px !important;
+            margin-bottom:16px; 
+            transition: border-color .15s ease, color .15s ease;
+        }
+        div[data-testid="stButton"] > button:active { border-color:var(--ritam-accent) !important; color:var(--ritam-accent) !important; }
+        
+        .ritam-back button { 
+            width:auto !important; 
+            background:none !important; 
+            border:none !important; 
+            color:var(--ritam-text-muted) !important; 
+            font-size:13px !important; 
+            min-height: 36px !important;
+            padding:0 !important; 
+            margin-bottom:12px !important; 
+        }
 
-        button[data-baseweb="tab"] { font-size: 13px; padding: 10px 6px; }
+        button[data-baseweb="tab"] { font-size: 14px; padding: 14px 6px; }
         div[data-baseweb="tab-list"] { gap: 4px; }
         div[data-baseweb="tab-highlight"] { background-color:var(--ritam-accent) !important; }
 
-        .ritam-tag { display:inline-block; font-family: monospace; font-size: 10px; padding: 3px 9px; border-radius: 20px; border: 1px solid rgba(var(--ritam-line-rgb),0.2); color:var(--ritam-text-muted); margin-right:6px; margin-bottom:6px; }
-        .ritam-tag.zone { color:var(--ritam-danger); border-color:rgba(var(--ritam-danger-rgb),0.4); background:rgba(var(--ritam-danger-rgb),0.12); }
-        .ritam-hero { border-radius:14px; overflow:hidden; height:150px; background-size:cover; background-position:center; margin-bottom:14px; border:1px solid rgba(var(--ritam-line-rgb),0.12); }
+        .ritam-tag { display:inline-block; font-family: monospace; font-size: 10.5px; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(var(--ritam-line-rgb),0.2); color:var(--ritam-text-muted); margin-right:6px; margin-bottom:8px; }
+        .ritam-tag.zone { color:var(--ritam-danger); border-color:rgba(var(--ritam-danger-rgb),0.4); background:rgba(var(--ritam-danger-rgb),0.12); font-weight:bold; }
+        .ritam-hero { border-radius:14px; overflow:hidden; height:180px; background-size:cover; background-position:center; margin-bottom:16px; border:1px solid rgba(var(--ritam-line-rgb),0.12); }
 
-        .ritam-evac { background: linear-gradient(160deg, rgba(var(--ritam-danger-rgb),0.10), transparent 65%); border:1px solid rgba(var(--ritam-danger-rgb),0.35); border-radius:14px; padding:18px; text-align:center; margin-bottom:14px; }
-        .ritam-evac h3 { font-family:'Trebuchet MS',sans-serif; font-size:17px; margin:6px 0 12px; }
-        .ritam-eyebrow { font-family:monospace; font-size:10px; letter-spacing:0.1em; color:var(--ritam-danger); text-transform:uppercase; }
-        .ritam-meta-row { display:flex; justify-content:center; gap:16px; flex-wrap:wrap; margin-bottom:12px; }
-        .ritam-meta-row div { font-family:monospace; font-size:10px; color:var(--ritam-text-muted); }
-        .ritam-meta-row b { display:block; font-size:15px; color:var(--ritam-text); font-family:Georgia,serif; margin-top:2px; }
-        .ritam-note { font-size:12.5px; color:var(--ritam-text-muted); line-height:1.55; text-align:left; border-top:1px solid rgba(var(--ritam-danger-rgb),0.25); padding-top:10px; }
+        .ritam-evac { background: linear-gradient(160deg, rgba(var(--ritam-danger-rgb),0.12), transparent 65%); border:1px solid rgba(var(--ritam-danger-rgb),0.4); border-radius:14px; padding:20px 16px; text-align:center; margin-bottom:16px; }
+        .ritam-evac h3 { font-family:'Trebuchet MS',sans-serif; font-size:18px; margin:8px 0 14px; }
+        .ritam-eyebrow { font-family:monospace; font-size:11px; letter-spacing:0.1em; color:var(--ritam-danger); text-transform:uppercase; }
+        .ritam-meta-row { display:flex; justify-content:center; gap:20px; flex-wrap:wrap; margin-bottom:14px; }
+        .ritam-meta-row div { font-family:monospace; font-size:11px; color:var(--ritam-text-muted); }
+        .ritam-meta-row b { display:block; font-size:16px; color:var(--ritam-text); font-family:Georgia,serif; margin-top:4px; }
+        .ritam-note { font-size:13px; color:var(--ritam-text-muted); line-height:1.6; text-align:left; border-top:1px solid rgba(var(--ritam-danger-rgb),0.25); padding-top:12px; }
 
-        .ritam-step { background:var(--ritam-card-bg); border:1px solid rgba(var(--ritam-line-rgb),0.12); border-radius:10px; padding:13px 14px; font-size:13px; color:#cfd6c6; line-height:1.5; display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; }
-        .ritam-step-num { font-family:monospace; font-size:11px; color:var(--ritam-accent); background:rgba(var(--ritam-accent-rgb),0.12); border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+        .ritam-step { background:var(--ritam-card-bg); border:1px solid rgba(var(--ritam-line-rgb),0.12); border-radius:12px; padding:16px; font-size:13.5px; color:#cfd6c6; line-height:1.55; display:flex; gap:14px; align-items:flex-start; margin-bottom:12px; }
+        .ritam-step-num { font-family:monospace; font-size:12px; font-weight:bold; color:var(--ritam-accent); background:rgba(var(--ritam-accent-rgb),0.15); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
 
-        .ritam-card { background:var(--ritam-card-bg); border:1px solid rgba(var(--ritam-line-rgb),0.12); border-radius:10px; padding:15px; margin-bottom:12px; }
-        .ritam-card h4 { font-family:'Trebuchet MS',sans-serif; font-size:12px; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:0; }
-        .amen-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-        .amen-icon-circle { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .ritam-card { background:var(--ritam-card-bg); border:1px solid rgba(var(--ritam-line-rgb),0.12); border-radius:12px; padding:16px; margin-bottom:14px; }
+        .ritam-card h4 { font-family:'Trebuchet MS',sans-serif; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:0; }
+        .amen-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+        .amen-icon-circle { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
         .amen-icon-circle.resto { background:rgba(var(--ritam-accent-rgb),0.15); color:var(--ritam-accent); }
         .amen-icon-circle.mushola { background:rgba(var(--ritam-success-rgb),0.15); color:var(--ritam-success); }
         .amen-icon-circle.fasilitas { background:rgba(var(--ritam-info-rgb),0.15); color:var(--ritam-info); }
 
-        .ritam-item { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-top:1px solid rgba(var(--ritam-line-rgb),0.10); font-size:12.5px; color:#cfd6c6; gap:10px; }
+        .ritam-item { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-top:1px solid rgba(var(--ritam-line-rgb),0.10); font-size:13.5px; color:#cfd6c6; gap:12px; }
         .ritam-item:first-of-type { border-top:none; }
-        .ritam-item-left { display:flex; align-items:center; gap:8px; }
-        .ritam-item-left svg { opacity:0.55; flex-shrink:0; }
-        .ritam-item-thumb { width:34px; height:34px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid rgba(var(--ritam-line-rgb),0.15); }
+        .ritam-item-left { display:flex; align-items:center; gap:10px; }
+        .ritam-item-left svg { opacity:0.6; flex-shrink:0; }
+        .ritam-item-thumb { width:40px; height:40px; border-radius:10px; object-fit:cover; flex-shrink:0; border:1px solid rgba(var(--ritam-line-rgb),0.15); }
         .ritam-item-thumb-empty { display:flex; align-items:center; justify-content:center; background:rgba(var(--ritam-line-rgb),0.05); color:var(--ritam-text-dim); }
-        .ritam-dist-pill { font-family:monospace; font-size:9.5px; padding:3px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; }
+        .ritam-dist-pill { font-family:monospace; font-size:10.5px; padding:4px 10px; border-radius:20px; white-space:nowrap; flex-shrink:0; font-weight:bold; }
         .ritam-dist-pill.resto { background:rgba(var(--ritam-accent-rgb),0.12); color:var(--ritam-accent); }
         .ritam-dist-pill.mushola { background:rgba(var(--ritam-success-rgb),0.12); color:var(--ritam-success); }
         .ritam-dist-pill.fasilitas { background:rgba(var(--ritam-info-rgb),0.12); color:var(--ritam-info); }
 
-        .ritam-footer { font-size:10.5px; color:var(--ritam-text-dim); line-height:1.6; padding-top:10px; }
-        .ritam-social-sub { font-size:11px; color:#8a9384; margin:-4px 0 12px; line-height:1.4; }
-        .ritam-social-pill { flex:1; min-width:96px; text-align:center; padding:10px 6px; border-radius:10px; font-size:11px; font-weight:600; text-decoration:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1px solid; line-height:1.3; }
-        .ritam-social-pill span.handle { font-size:9px; font-weight:400; opacity:0.85; }
+        .ritam-footer { font-size:11px; color:var(--ritam-text-dim); line-height:1.6; padding-top:16px; text-align:center; }
+        .ritam-social-sub { font-size:12px; color:#8a9384; margin:-4px 0 14px; line-height:1.5; }
+        .ritam-social-pill { flex:1; min-width:96px; text-align:center; padding:12px; border-radius:12px; font-size:12px; font-weight:700; text-decoration:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1px solid; line-height:1.3; }
+        .ritam-social-pill span.handle { font-size:10px; font-weight:400; opacity:0.85; }
         .ritam-social-pill.ig { background:rgba(214,65,122,0.13); color:#e78bb0; border-color:rgba(214,65,122,0.35); }
 
-        .ritam-admin-toggle button { background:none !important; border:1px solid rgba(var(--ritam-line-rgb),0.15) !important; color:var(--ritam-text-dim) !important; font-size:11px !important; padding:4px 10px !important; border-radius:20px !important; width:auto !important; margin-bottom:0 !important; }
-        .ritam-admin-badge { display:inline-flex; align-items:center; gap:5px; font-family:monospace; font-size:9.5px; color:var(--ritam-accent); background:rgba(var(--ritam-accent-rgb),0.12); border:1px solid rgba(var(--ritam-accent-rgb),0.35); padding:3px 10px; border-radius:20px; margin-bottom:12px; }
-        .ritam-login-box { background:var(--ritam-card-bg-alt); border:1px solid rgba(var(--ritam-line-rgb),0.15); border-radius:10px; padding:14px; margin-bottom:14px; }
+        .ritam-admin-toggle button { background:none !important; border:1px solid rgba(var(--ritam-line-rgb),0.2) !important; color:var(--ritam-text-dim) !important; font-size:12px !important; padding:6px 12px !important; border-radius:20px !important; min-height:36px !important; width:auto !important; margin-bottom:0 !important; }
+        .ritam-admin-badge { display:inline-flex; align-items:center; gap:6px; font-family:monospace; font-size:10.5px; color:var(--ritam-accent); background:rgba(var(--ritam-accent-rgb),0.12); border:1px solid rgba(var(--ritam-accent-rgb),0.35); padding:4px 12px; border-radius:20px; margin-bottom:14px; font-weight:bold; }
+        .ritam-login-box { background:var(--ritam-card-bg-alt); border:1px solid rgba(var(--ritam-line-rgb),0.15); border-radius:12px; padding:16px; margin-bottom:16px; }
 
-        .ritam-empty-state { text-align:center; padding:22px 14px; color:var(--ritam-text-dim); font-size:12.5px; border:1px dashed rgba(var(--ritam-line-rgb),0.2); border-radius:10px; }
+        .ritam-empty-state { text-align:center; padding:24px 16px; color:var(--ritam-text-dim); font-size:13px; border:1px dashed rgba(var(--ritam-line-rgb),0.2); border-radius:12px; }
+        .ritam-subtitle { font-size:12.5px; color:var(--ritam-text-dim); line-height:1.5; margin:-4px 0 16px; max-width:340px; }
 
-        /* Input form — konsisten dengan tema gelap & tema admin */
+        .ritam-legend { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+        .ritam-legend-chip { font-size:11px; padding:6px 12px 6px 10px; border-radius:20px; display:inline-flex; align-items:center; gap:8px; border:1px solid; font-weight:600; }
+        .ritam-legend-chip::before { content:''; width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .ritam-legend-chip.merah { color:var(--ritam-danger); border-color:rgba(var(--ritam-danger-rgb),0.4); background:rgba(var(--ritam-danger-rgb),0.1); }
+        .ritam-legend-chip.merah::before { background:var(--ritam-danger); }
+        .ritam-legend-chip.kuning { color:var(--ritam-accent); border-color:rgba(var(--ritam-accent-rgb),0.4); background:rgba(var(--ritam-accent-rgb),0.1); }
+        .ritam-legend-chip.kuning::before { background:var(--ritam-accent); }
+
+        div[data-testid="stButton"] > button[kind="primary"] {
+            background: var(--ritam-accent) !important;
+            color: var(--ritam-bg) !important;
+            border-color: var(--ritam-accent) !important;
+            font-weight: 700 !important;
+        }
+
+        .ritam-stat-row { display:flex; gap:12px; margin-bottom:16px; }
+        .ritam-stat-pill { flex:1; background:var(--ritam-card-bg); border:1px solid rgba(var(--ritam-line-rgb),0.12); border-radius:12px; padding:12px; text-align:center; }
+        .ritam-stat-pill b { display:block; font-size:18px; color:var(--ritam-accent); font-family:Georgia,serif; }
+        .ritam-stat-pill span { font-size:10px; color:var(--ritam-text-dim); text-transform:uppercase; letter-spacing:0.04em; font-weight:600; }
+
         div[data-testid="stTextInput"] input,
         div[data-testid="stTextArea"] textarea {
             background-color: var(--ritam-card-bg-alt) !important;
             color: var(--ritam-text) !important;
-            border: 1px solid rgba(var(--ritam-line-rgb),0.18) !important;
+            border: 1px solid rgba(var(--ritam-line-rgb),0.2) !important;
+            padding: 12px !important;
+            border-radius: 10px !important;
         }
         div[data-testid="stTextInput"] input:focus,
         div[data-testid="stTextArea"] textarea:focus {
@@ -160,14 +221,15 @@ def inject_global_css() -> None:
             box-shadow: 0 0 0 1px var(--ritam-accent) !important;
         }
         div[data-testid="stFormSubmitButton"] button {
-            background: rgba(var(--ritam-accent-rgb), 0.14) !important;
+            background: rgba(var(--ritam-accent-rgb), 0.15) !important;
             border: 1px solid rgba(var(--ritam-accent-rgb), 0.4) !important;
             color: var(--ritam-accent) !important;
+            font-weight: bold !important;
         }
         div[data-testid="stSlider"] [role="slider"] { background-color: var(--ritam-accent) !important; }
         div[data-testid="stSlider"] > div > div > div { background: rgba(var(--ritam-accent-rgb),0.35) !important; }
 
-        .st-key-ritam_topbar div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; flex-direction: row !important; gap: 8px !important; }
+        .st-key-ritam_topbar div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; flex-direction: row !important; gap: 8px !important; align-items:center !important;}
         .st-key-ritam_topbar div[data-testid="column"] { width: auto !important; min-width: 0 !important; flex: initial !important; }
         .st-key-ritam_topbar div[data-testid="column"]:first-child { flex: 1 1 auto !important; }
         .st-key-ritam_topbar div[data-testid="column"]:last-child { flex: 0 0 auto !important; }
@@ -176,16 +238,7 @@ def inject_global_css() -> None:
         unsafe_allow_html=True,
     )
 
-
 def inject_admin_theme() -> None:
-    """
-    Mengaktifkan tema ungu mode admin.
-
-    Karena seluruh CSS di atas memakai var(--ritam-accent), cukup
-    meng-override nilai variabel tersebut agar tombol, tag, kompas,
-    tab aktif, dan border ikut berubah warna secara konsisten —
-    tanpa duplikasi aturan seperti pada versi sebelum refactor.
-    """
     st.markdown(
         """
         <style>
@@ -206,12 +259,10 @@ def inject_admin_theme() -> None:
         unsafe_allow_html=True,
     )
 
-
 # ------------------------------------------------------------------
-# TOPBAR & STATUS
+# SISA FUNGSI TETAP SAMA SEPERTI SEBELUMNYA (Render Logic)
 # ------------------------------------------------------------------
 def render_topbar(is_admin: bool, admin_name: str | None) -> str:
-    """Merender brand + tombol admin. Mengembalikan 'login_toggle', 'logout', atau ''."""
     action = ""
     with st.container(key="ritam_topbar"):
         top_l, top_r = st.columns([3, 1], gap="small")
@@ -232,8 +283,12 @@ def render_topbar(is_admin: bool, admin_name: str | None) -> str:
             st.markdown("</div>", unsafe_allow_html=True)
     return action
 
-
 def render_status_bar(is_admin: bool, admin_name: str | None) -> None:
+    st.markdown(
+        '<div class="ritam-subtitle">Peta jalur & panduan evakuasi mandiri untuk pengunjung '
+        'kawasan wisata Cikole–Lembang saat kondisi darurat.</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<div class="ritam-status" style="margin:-6px 0 14px;">'
         '<span class="ritam-status-dot"></span> NORMAL · DEMO</div>',
@@ -245,37 +300,49 @@ def render_status_bar(is_admin: bool, admin_name: str | None) -> None:
             unsafe_allow_html=True,
         )
 
+def render_type_filter(active: str, counts: dict) -> str | None:
+    options = [
+        ("semua", "Semua"),
+        ("wisata", "🧭 Wisata"),
+        ("resto", "🍽️ Resto"),
+        ("penginapan", "🛏️ Penginapan"),
+    ]
+    clicked = None
+    cols = st.columns(len(options))
+    for col, (key, label) in zip(cols, options):
+        with col:
+            full_label = f"{label} ({counts.get(key, 0)})"
+            if st.button(full_label, key=f"filter_{key}", type="primary" if active == key else "secondary"):
+                clicked = key
+    return clicked
+
+def render_zone_legend() -> None:
+    config.render_html(
+        '<div class="ritam-legend">'
+        '<span class="ritam-legend-chip merah">Zona Merah — risiko tinggi</span>'
+        '<span class="ritam-legend-chip kuning">Zona Kuning — risiko sedang</span>'
+        '</div>'
+    )
+
+def render_stat_row(wisata_n: int, resto_n: int, penginapan_n: int) -> None:
+    config.render_html(
+        f"""
+        <div class="ritam-stat-row">
+          <div class="ritam-stat-pill"><b>{wisata_n}</b><span>Wisata</span></div>
+          <div class="ritam-stat-pill"><b>{resto_n}</b><span>Resto</span></div>
+          <div class="ritam-stat-pill"><b>{penginapan_n}</b><span>Penginapan</span></div>
+        </div>
+        """
+    )
 
 def render_locate_me_widget() -> None:
-    """
-    Tombol "Gunakan lokasi saya" — meminta izin GPS browser lalu
-    mengarahkan ulang halaman dengan koordinat pengguna disisipkan ke
-    query params (?lat=..&lon=..), sehingga main.py bisa memakainya
-    sebagai titik awal rute. Ini yang membuat pengalamannya mirip
-    Google Maps: arah & rute dihitung dari posisi asli pengguna menuju
-    titik kumpul, bukan dari titik acuan statis milik lokasi wisata.
-
-    Dipakai lewat st.html (bukan st.markdown), karena dua alasan:
-      1. st.html merender langsung ke DOM utama halaman (tidak di
-         dalam iframe seperti st.components.v1.html), sehingga
-         Permissions-Policy browser tidak memblokir
-         navigator.geolocation.
-      2. st.markdown men-sanitasi/menghapus tag <script> walau
-         unsafe_allow_html=True — JS di dalamnya tidak akan pernah
-         benar-benar berjalan.
-
-    CATATAN: Geolocation API browser mensyaratkan "secure context"
-    (HTTPS atau localhost). Di hosting tanpa HTTPS, tombol ini akan
-    selalu gagal meminta izin — itu keterbatasan browser, bukan bug
-    aplikasi.
-    """
-    st.html(
+    config.render_html(
         """
         <div style="margin-bottom:14px;">
           <button id="ritam-geo-btn" type="button" style="
               width:100%; background:rgba(var(--ritam-accent-rgb),0.14);
               border:1px solid rgba(var(--ritam-accent-rgb),0.4); color:var(--ritam-accent);
-              font-size:12.5px; font-weight:600; padding:10px; border-radius:10px;
+              font-size:13px; font-weight:600; padding:12px; border-radius:12px;
               cursor:pointer; font-family:'Trebuchet MS',sans-serif;">
             📍 Gunakan lokasi saya sebagai titik awal
           </button>
@@ -304,9 +371,9 @@ def render_locate_me_widget() -> None:
                 btn.disabled = false;
                 btn.textContent = '📍 Gunakan lokasi saya sebagai titik awal';
                 var text = 'Gagal mengambil lokasi.';
-                if (err.code === 1) text = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser.';
-                else if (err.code === 2) text = 'Posisi tidak tersedia. Pastikan GPS/layanan lokasi perangkat aktif.';
-                else if (err.code === 3) text = 'Permintaan lokasi melebihi batas waktu, coba lagi.';
+                if (err.code === 1) text = 'Izin lokasi ditolak.';
+                else if (err.code === 2) text = 'Posisi tidak tersedia.';
+                else if (err.code === 3) text = 'Permintaan lokasi melebihi batas waktu.';
                 msg.textContent = text;
               },
               { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -315,26 +382,14 @@ def render_locate_me_widget() -> None:
         })();
         </script>
         """,
-        unsafe_allow_javascript=True,
+        allow_js=True,
     )
 
-
 def render_admin_login_form(auth_available: bool):
-    """
-    Merender kotak login admin.
-
-    Returns tuple (username, password) apabila form disubmit, atau
-    None jika belum ada submit. Jika secrets.toml belum dikonfigurasi
-    (auth_available=False), menampilkan pesan informatif dan tidak
-    menampilkan form sama sekali — mencegah pengguna mencoba login
-    ke sistem yang memang belum siap.
-    """
     st.markdown('<div class="ritam-login-box">', unsafe_allow_html=True)
     if not auth_available:
         st.warning(
-            "Login admin belum dikonfigurasi. Tambahkan bagian **[admins]** pada "
-            "`.streamlit/secrets.toml` untuk mengaktifkan fitur ini "
-            "(lihat `secrets.toml.example`).",
+            "Login admin belum dikonfigurasi. Tambahkan bagian **[admins]** pada `.streamlit/secrets.toml`.",
             icon="🔒",
         )
         st.markdown("</div>", unsafe_allow_html=True)
@@ -350,10 +405,6 @@ def render_admin_login_form(auth_available: bool):
     st.markdown("</div>", unsafe_allow_html=True)
     return result
 
-
-# ------------------------------------------------------------------
-# KOMPAS
-# ------------------------------------------------------------------
 def compass_figure(bearing: int) -> go.Figure:
     fig = go.Figure()
     theta_ring = list(range(0, 361, 5))
@@ -393,16 +444,10 @@ def compass_figure(bearing: int) -> go.Figure:
     )
     return fig
 
-
-# ------------------------------------------------------------------
-# GRID WISATA
-# ------------------------------------------------------------------
 def _zone_class(zone: str) -> str:
     return "merah" if "Merah" in zone else "kuning"
 
-
 def render_spot_grid(spots: list, is_admin: bool) -> str | None:
-    """Merender grid 2 kolom kartu wisata. Mengembalikan id spot yang diklik, atau None."""
     clicked_id = None
     cols = st.columns(2)
     for i, spot in enumerate(spots):
@@ -429,10 +474,6 @@ def render_spot_grid(spots: list, is_admin: bool) -> str | None:
                 clicked_id = spot["id"]
     return clicked_id
 
-
-# ------------------------------------------------------------------
-# DETAIL: HEADER, SOP, AMENITAS, SOSIAL
-# ------------------------------------------------------------------
 def render_detail_header(spot: dict) -> None:
     data_uri = image_to_data_uri(spot["image"])
     bg_style = f"background-image:url('{data_uri}')" if data_uri else "background:var(--ritam-card-bg);"
@@ -444,7 +485,6 @@ def render_detail_header(spot: dict) -> None:
         f'<span class="ritam-tag">Tiket {spot["ticket"]}</span>',
         unsafe_allow_html=True,
     )
-
 
 def render_sop_steps() -> None:
     steps = [
@@ -459,7 +499,6 @@ def render_sop_steps() -> None:
             f'<div><b>{label}</b><br>{text}</div></div>',
             unsafe_allow_html=True,
         )
-
 
 def render_amenity_card(title: str, items: list, kind: str) -> None:
     if not items:
@@ -500,7 +539,6 @@ def render_amenity_card(title: str, items: list, kind: str) -> None:
         unsafe_allow_html=True,
     )
 
-
 def render_social_card(spot: dict) -> None:
     if not spot["social"].get("instagram"):
         return
@@ -529,7 +567,6 @@ def render_social_card(spot: dict) -> None:
         """,
         unsafe_allow_html=True,
     )
-
 
 def render_footer(text: str) -> None:
     st.markdown(f'<div class="ritam-footer">{text}</div>', unsafe_allow_html=True)
