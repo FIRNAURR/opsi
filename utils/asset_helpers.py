@@ -17,7 +17,14 @@ from config import ASSETS_DIR
 @st.cache_data(show_spinner=False)
 def image_to_data_uri(filename: str) -> str:
     """
-    Mengonversi file gambar di ASSETS_DIR menjadi data URI base64.
+    Mengembalikan src gambar siap pakai untuk atribut `src`/`background-image`.
+
+    Dua sumber didukung:
+      - URL http(s) (mis. foto yang ditempel admin lewat form "Tambah
+        Destinasi"/"Tambah Layanan") -> dikembalikan apa adanya, browser
+        yang mengambil gambarnya langsung.
+      - Nama file lokal di ASSETS_DIR (foto destinasi bawaan) -> dibaca
+        dari disk dan diubah jadi data URI base64.
 
     Mengembalikan string kosong secara aman apabila nama file kosong
     atau file tidak ditemukan/tidak dapat dibaca, sehingga pemanggil
@@ -26,6 +33,8 @@ def image_to_data_uri(filename: str) -> str:
     """
     if not filename:
         return ""
+    if filename.startswith("http://") or filename.startswith("https://"):
+        return filename
     try:
         path = os.path.join(ASSETS_DIR, filename)
         with open(path, "rb") as f:
