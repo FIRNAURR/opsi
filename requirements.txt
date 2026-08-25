@@ -2,3 +2,4 @@ streamlit>=1.32
 folium>=0.15
 plotly>=5.18
 requests>=2.31
+charset-normalizer>=3.3
