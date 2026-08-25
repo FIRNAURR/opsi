@@ -2,28 +2,10 @@
 utils/map_helpers.py
 =====================
 Logika geospasial aplikasi: pembuatan peta Folium, pemanggilan API
-OSRM untuk rute pejalan kaki, parsing instruksi navigasi ke Bahasa
-Indonesia, dan util arah mata angin.
-
-RESILIENCY
-----------
-OSRM adalah layanan pihak ketiga publik yang bisa timeout, down,
-atau tidak menemukan rute. Modul ini didesain agar kegagalan
-tersebut TIDAK PERNAH membuat aplikasi crash atau menampilkan
-traceback ke pengguna:
-
-  1. Setiap kegagalan jaringan ditangkap secara spesifik
-     (Timeout, ConnectionError, RequestException) maupun umum.
-  2. Ketika OSRM gagal, peta tetap dirender dengan fallback berupa
-     garis lurus antara lokasi wisata dan titik kumpul, dilabeli
-     jelas sebagai estimasi.
-  3. Fungsi mengembalikan `status` eksplisit ("ok" / "fallback" /
-     "no_route") agar lapisan UI (main.py) bisa menampilkan
-     st.toast/pesan yang sesuai tanpa perlu mem-parsing HTML.
+OSRM untuk rute pejalan kaki, parsing instruksi navigasi, dan arah kompas.
 """
 
 import math
-
 import folium
 import requests
 import streamlit as st
@@ -32,25 +14,13 @@ from folium import plugins
 from config import MAP_CACHE_TTL_SECONDS, OSRM_BASE_URL, OSRM_TIMEOUT_SECONDS
 from data import DIR_LABEL
 
-
 def bearing_to_label(deg: int) -> str:
-    """Mengubah derajat kompas (0-359) menjadi label arah mata angin Indonesia."""
     dirs = [("U", 0), ("TL", 45), ("T", 90), ("TG", 135), ("S", 180),
             ("BD", 225), ("B", 270), ("BL", 315)]
     closest = min(dirs, key=lambda d: min(abs(deg - d[1]), 360 - abs(deg - d[1])))
     return DIR_LABEL[closest[0]]
 
-
 def compute_bearing(start_coords: list, end_coords: list) -> int:
-    """
-    Menghitung bearing (arah kompas awal, derajat 0-359) dari start_coords
-    menuju end_coords memakai rumus forward azimuth pada bola bumi.
-
-    Dipakai saat start_coords berasal dari GPS pengguna secara langsung
-    (bukan titik acuan statis milik lokasi wisata) — agar arah kompas
-    yang ditampilkan selalu akurat terhadap posisi nyata pengguna,
-    persis seperti panah arah pada Google Maps.
-    """
     lat1, lon1 = math.radians(start_coords[0]), math.radians(start_coords[1])
     lat2, lon2 = math.radians(end_coords[0]), math.radians(end_coords[1])
     dlon = lon2 - lon1
@@ -60,9 +30,7 @@ def compute_bearing(start_coords: list, end_coords: list) -> int:
     bearing = math.degrees(math.atan2(x, y))
     return round((bearing + 360) % 360)
 
-
 def parse_directions(steps: list) -> list:
-    """Mengubah langkah mentah (steps) dari respons OSRM menjadi kalimat instruksi."""
     instructions = []
     for step in steps:
         dist = round(step.get("distance", 0))
@@ -72,9 +40,6 @@ def parse_directions(steps: list) -> list:
         name = step.get("name", "")
 
         street = name if name != "" else "jalan setapak/gang"
-        # Modifier mentah dari OSRM: straight, slight left/right, left/right,
-        # sharp left/right, uturn. Seluruh kombinasi diterjemahkan di sini
-        # agar tidak ada kata berbahasa Inggris yang lolos ke instruksi.
         arah = (
             m_mod.replace("sharp", "tajam")
             .replace("slight", "sedikit")
@@ -99,60 +64,47 @@ def parse_directions(steps: list) -> list:
             instructions.append(txt)
     return instructions
 
-
 def _build_base_map(start_coords, end_coords, spot_name, safe_name):
-    """Peta dasar bertema gelap beserta marker lokasi wisata & titik kumpul."""
+    """Peta dasar dengan tema OpenStreetMap (Klasik berwarna seperti Google Maps)."""
     m = folium.Map(
         location=[
             (start_coords[0] + end_coords[0]) / 2,
             (start_coords[1] + end_coords[1]) / 2,
         ],
-        zoom_start=15,
-        tiles="OpenStreetMap",
+        zoom_start=16, 
+        tiles="OpenStreetMap", # <--- TEMA KLASIK (Jalanan kuning/putih, taman hijau, dll)
     )
+    
+    # Marker Titik Awal (Lokasi Wisata / User)
     folium.CircleMarker(
-        location=start_coords, radius=6, color="white", weight=1.5, fill=True,
+        location=start_coords, radius=7, color="white", weight=2, fill=True,
         fill_color="#e6572a", fill_opacity=1, tooltip=f"Lokasi: {spot_name}",
     ).add_to(m)
+    
+    # Zona Titik Kumpul
     folium.Circle(
-        location=end_coords, radius=60, color="#7fae67", weight=1, fill=True,
-        fill_color="#7fae67", fill_opacity=0.3, tooltip=f"Area Aman: {safe_name}",
+        location=end_coords, radius=50, color="#7fae67", weight=2, fill=True,
+        fill_color="#7fae67", fill_opacity=0.4, tooltip=f"Area Aman: {safe_name}",
     ).add_to(m)
+    
+    # Marker Titik Kumpul (Hijau)
     folium.CircleMarker(
         location=end_coords, radius=8, color="white", weight=2, fill=True,
         fill_color="#2c7a3f", fill_opacity=1,
     ).add_to(m)
+    
     return m
 
-
 def _draw_fallback_route(m: folium.Map, start_coords, end_coords) -> None:
-    """Fallback saat OSRM tidak tersedia: garis lurus putus-putus + fit bounds."""
+    # Garis putus-putus jika OSRM gagal
     folium.PolyLine(
         locations=[start_coords, end_coords],
-        color="#f2b544", weight=3, opacity=0.75, dash_array="6, 10",
+        color="#1A73E8", weight=5, opacity=0.8, dash_array="8, 12",
     ).add_to(m)
     m.fit_bounds([start_coords, end_coords])
 
-
 @st.cache_data(show_spinner="🗺️ Menghitung rute evakuasi teraman...", ttl=MAP_CACHE_TTL_SECONDS)
 def generate_evac_map_and_instructions(spot_name: str, start_coords: list, end_coords: list, safe_name: str):
-    """
-    Menghasilkan peta evakuasi beserta instruksi jalan kaki.
-
-    Returns
-    -------
-    map_html : str
-        HTML peta Folium siap dirender lewat st.components.v1.html.
-    instructions_html : str
-        Blok HTML kartu berisi estimasi jarak/waktu dan daftar instruksi.
-    status : str
-        "ok"        -> rute OSRM berhasil dimuat.
-        "fallback"  -> OSRM gagal dihubungi, memakai estimasi garis lurus.
-        "no_route"  -> OSRM terhubung tapi tidak menemukan rute pejalan kaki.
-
-    Fungsi ini TIDAK PERNAH melempar exception ke pemanggil — setiap
-    kegagalan ditangani secara internal dengan fallback yang aman.
-    """
     m = _build_base_map(start_coords, end_coords, spot_name, safe_name)
 
     lon_s, lat_s = start_coords[1], start_coords[0]
@@ -177,9 +129,14 @@ def generate_evac_map_and_instructions(spot_name: str, start_coords: list, end_c
         coords = route_data["geometry"]["coordinates"]
         route_lat_lon = [[lat, lon] for lon, lat in coords]
 
+        # TITIK-TITIK RUTE (Animasi Berjalan)
         plugins.AntPath(
-            locations=route_lat_lon, dash_array=[10, 20], delay=800,
-            color="#1f472a", pulse_color="#f2b544", weight=4,
+            locations=route_lat_lon, 
+            dash_array=[15, 30], 
+            delay=1000,          
+            color="#1A73E8",     # Warna biru persis seperti jalur Google Maps
+            pulse_color="#FFFFFF", 
+            weight=6,            # Sedikit lebih tebal agar jelas di atas peta warna-warni
         ).add_to(m)
         m.fit_bounds(route_lat_lon)
 
@@ -195,48 +152,18 @@ def generate_evac_map_and_instructions(spot_name: str, start_coords: list, end_c
         steps = route_data["legs"][0]["steps"]
         for text in parse_directions(steps):
             html_output += (
-                f"<li style='margin-bottom: 8px; font-size: 12.5px; "
+                f"<li style='margin-bottom: 8px; font-size: 13px; "
                 f"color:var(--ritam-text-muted); line-height:1.5;'>{text}</li>"
             )
         html_output += "</ul>"
 
-    except requests.exceptions.Timeout:
-        status = "fallback"
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException, ValueError, KeyError, IndexError, Exception) as e:
+        status = "fallback" if not isinstance(e, (ValueError, KeyError, IndexError)) else "no_route"
         _draw_fallback_route(m, start_coords, end_coords)
-        html_output += (
-            "<p style='color:var(--ritam-accent); font-size:12px; margin:0;'>"
-            "⏱️ Server navigasi tidak merespons tepat waktu. Peta menampilkan estimasi "
-            "arah garis lurus — ikuti jalur fisik terdekat menuju titik kumpul.</p>"
-        )
-
-    except (requests.exceptions.ConnectionError, requests.exceptions.RequestException):
-        status = "fallback"
-        _draw_fallback_route(m, start_coords, end_coords)
-        html_output += (
-            "<p style='color:var(--ritam-accent); font-size:12px; margin:0;'>"
-            "📡 Tidak dapat terhubung ke server navigasi saat ini. Peta menampilkan "
-            "estimasi arah garis lurus sebagai panduan sementara.</p>"
-        )
-
-    except (ValueError, KeyError, IndexError):
-        status = "no_route"
-        _draw_fallback_route(m, start_coords, end_coords)
-        html_output += (
-            "<p style='color:var(--ritam-accent); font-size:12px; margin:0;'>"
-            "🧭 Rute pejalan kaki otomatis tidak ditemukan untuk lokasi ini. Peta "
-            "menampilkan estimasi arah garis lurus menuju titik kumpul.</p>"
-        )
-
-    except Exception:
-        # Jaring pengaman terakhir — apa pun yang tidak terduga tetap
-        # menghasilkan tampilan yang aman, bukan traceback di layar pengguna.
-        status = "fallback"
-        _draw_fallback_route(m, start_coords, end_coords)
-        html_output += (
-            "<p style='color:var(--ritam-accent); font-size:12px; margin:0;'>"
-            "⚠️ Terjadi kendala saat memuat rute. Peta menampilkan estimasi arah "
-            "garis lurus sebagai panduan sementara.</p>"
-        )
+        pesan = "⚠️ Terjadi kendala memuat rute."
+        if status == "fallback": pesan = "📡 Server navigasi sedang sibuk. Menampilkan panduan arah lurus."
+        elif status == "no_route": pesan = "🧭 Rute jalan kaki otomatis tidak ditemukan."
+        html_output += f"<p style='color:var(--ritam-accent); font-size:12px; margin:0;'>{pesan}</p>"
 
     html_output += "</div>"
     map_html = m._repr_html_()
