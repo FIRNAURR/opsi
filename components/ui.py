@@ -1,7 +1,7 @@
 """
 components/ui.py
 =================
-(Versi Mobile-Optimized)
+(Versi Mobile-Optimized & Responsive Fix)
 Seluruh elemen presentasi aplikasi: injeksi CSS global, kompas arah,
 kartu grid wisata, kartu amenitas/sosial media, topbar, dan form
 login admin.
@@ -233,6 +233,34 @@ def inject_global_css() -> None:
         .st-key-ritam_topbar div[data-testid="column"] { width: auto !important; min-width: 0 !important; flex: initial !important; }
         .st-key-ritam_topbar div[data-testid="column"]:first-child { flex: 1 1 auto !important; }
         .st-key-ritam_topbar div[data-testid="column"]:last-child { flex: 0 0 auto !important; }
+
+        /* --- PERBAIKAN TOMBOL FILTER PADA LAYAR HP --- */
+        .st-key-ritam_filter_bar {
+            margin-bottom: 16px;
+        }
+        .st-key-ritam_filter_bar div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            flex-direction: row !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            gap: 6px !important;
+            padding-bottom: 4px;
+        }
+        .st-key-ritam_filter_bar div[data-testid="column"] {
+            width: auto !important;
+            min-width: max-content !important;
+            flex: 1 1 auto !important;
+        }
+        .st-key-ritam_filter_bar div[data-testid="stButton"] > button {
+            white-space: nowrap !important;
+            padding: 0 10px !important;
+            margin-bottom: 0 !important;
+            min-height: 38px !important;
+            font-size: 12px !important;
+        }
+        .st-key-ritam_filter_bar div[data-testid="stHorizontalBlock"]::-webkit-scrollbar {
+            display: none;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -260,7 +288,7 @@ def inject_admin_theme() -> None:
     )
 
 # ------------------------------------------------------------------
-# SISA FUNGSI TETAP SAMA SEPERTI SEBELUMNYA (Render Logic)
+# RENDER LOGIC
 # ------------------------------------------------------------------
 def render_topbar(is_admin: bool, admin_name: str | None) -> str:
     action = ""
@@ -308,12 +336,13 @@ def render_type_filter(active: str, counts: dict) -> str | None:
         ("penginapan", "🛏️ Penginapan"),
     ]
     clicked = None
-    cols = st.columns(len(options))
-    for col, (key, label) in zip(cols, options):
-        with col:
-            full_label = f"{label} ({counts.get(key, 0)})"
-            if st.button(full_label, key=f"filter_{key}", type="primary" if active == key else "secondary"):
-                clicked = key
+    with st.container(key="ritam_filter_bar"):
+        cols = st.columns(len(options))
+        for col, (key, label) in zip(cols, options):
+            with col:
+                full_label = f"{label} ({counts.get(key, 0)})"
+                if st.button(full_label, key=f"filter_{key}", type="primary" if active == key else "secondary"):
+                    clicked = key
     return clicked
 
 def render_zone_legend() -> None:
