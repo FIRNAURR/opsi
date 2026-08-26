@@ -178,7 +178,7 @@ SPOTS = [
     # (lihat catatan berkas). Sebaiknya disesuaikan admin via panel edit
     # begitu koordinat presisi lapangan tersedia.
     {
-        "id": "sindang-reret", "name": "Sindang Reret Cikole", "image": None,
+        "id": "sindang-reret", "name": "Sindang Reret Cikole", "image": "sindang_reret.jpg",
         "type": "resto_penginapan", "category": "🍽️🛏️ Resto & Penginapan Sunda", "zone": "Zona Kuning",
         "ticket": "Sesuai pesanan / tarif kamar",
         "evac": {"point": "Area Parkir Depan Sindang Reret", "bearing": 319,
@@ -194,7 +194,7 @@ SPOTS = [
         "social": {"instagram": "@sindangreretlembang", "instagram_url": None},
     },
     {
-        "id": "sate-maranggi-hj-ita", "name": "Warung Nasi Sunda Sate Maranggi Hj Ita", "image": None,
+        "id": "sate-maranggi-hj-ita", "name": "Warung Nasi Sunda Sate Maranggi Hj Ita", "image": "sate_maranggi.jpg",
         "type": "resto", "category": "🍽️ Kuliner Sunda & Sate Maranggi", "zone": "Zona Kuning",
         "ticket": "Sesuai pesanan",
         "evac": {"point": "Halaman Parkir Warung", "bearing": 53,
@@ -210,7 +210,7 @@ SPOTS = [
         "social": {"instagram": None, "instagram_url": None},
     },
     {
-        "id": "bobocabin-cikole", "name": "Bobocabin Cikole", "image": None,
+        "id": "bobocabin-cikole", "name": "Bobocabin Cikole", "image": "bobocabin.jpg",
         "type": "penginapan", "category": "🛏️ Glamping & Penginapan", "zone": "Zona Merah",
         "ticket": "Sesuai tarif kabin",
         "evac": {"point": "Area Api Unggun Bersama", "bearing": 140,
@@ -226,7 +226,7 @@ SPOTS = [
         "social": {"instagram": "@bobocabin", "instagram_url": None},
     },
     {
-        "id": "puteri-gunung-hotel", "name": "Puteri Gunung Hotel", "image": None,
+        "id": "puteri-gunung-hotel", "name": "Puteri Gunung Hotel", "image": "puteri-gunung.jpg",
         "type": "penginapan", "category": "🏨 Penginapan & Resort", "zone": "Zona Kuning",
         "ticket": "Sesuai tarif kamar",
         "evac": {"point": "Halaman Depan Hotel", "bearing": 50,
@@ -242,7 +242,7 @@ SPOTS = [
         "social": {"instagram": None, "instagram_url": None},
     },
     {
-        "id": "nirwana-lembang", "name": "Nirwana Hotel & Villa Lembang", "image": None,
+        "id": "nirwana-lembang", "name": "Nirwana Hotel & Villa Lembang", "image": "nirwana_lembang.jpg",
         "type": "penginapan", "category": "🏨 Penginapan Keluarga", "zone": "Zona Kuning",
         "ticket": "Sesuai tarif kamar/villa",
         "evac": {"point": "Area Kolam Renang Terbuka", "bearing": 54,
