@@ -32,10 +32,7 @@ SPOTS = [
                 ("Golden Pine Cafe", "TL · 140 m", "golden_pine.jpg"),
                 ("Aspasia Coffee", "B · 100 m", None),
                 ("Pine Kitchen", "B · 150 m", None),
-                ("Food Court & Food Corner", "T · 500 m", None)
-            ],
-            "layanan": [
-            ],
+                ("Food Court & Food Corner", "T · 500 m", None)],
             "mushola": [("Mushola dekat Entrance Gate", "B · 60 m")],
             "fasilitas & Layanan": [
                 ("Shuttle Car", "B · 50 m"),
@@ -52,7 +49,7 @@ SPOTS = [
                 ("Toilet umum (Area Parkir A & B)", "B · 70 m"),
                 ("Souvenir Shop", "T · 110 m"),
                 ("Pos Informasi & P3K", "T · 100 m")
-            ],
+            ]
         },
         "contact": {
             "phone": "0811 222 1284",
