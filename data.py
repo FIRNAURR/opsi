@@ -49,7 +49,7 @@ SPOTS = [
                 ("Toilet umum (Area Parkir A & B)", "B · 70 m"),
                 ("Souvenir Shop", "T · 110 m"),
                 ("Pos Informasi & P3K", "T · 100 m")
-            ]
+            ],
         },
         "contact": {
             "phone": "0811 222 1284",
