@@ -32,20 +32,23 @@ SPOTS = [
                 ("Golden Pine Cafe", "TL · 140 m", "golden_pine.jpg"),
                 ("Aspasia Coffee", "B · 100 m", None),
                 ("Pine Kitchen", "B · 150 m", None),
-                ("Food Court & Food Corner", "T · 500 m", None)],
-            "mushola": [("Mushola dekat Entrance Gate", "B · 60 m")],
-            "fasilitas & Layanan": [
-                ("Shuttle Car", "B · 50 m"),
-                ("Putt Putt Golf", "T · 400 m"),
-                ("Teras Paphio", "T · 120 m"),
+                ("Food Court & Food Corner", "T · 500 m", None)
+            ],
+            "layanan": [
                 ("Orchid House & Greenhouse", "B · 250 m"),
                 ("Bazaar Anggrek", "T · 300 m"),
                 ("Garden of Light", "B · 350 m"),
+                ("Putt Putt Golf", "T · 400 m"),
                 ("Rabbit Forest & Pet Venture", "B · 450 m"),
                 ("Wood Bridge & Flying Fox", "B · 550 m"),
                 ("Orchid Castle", "T · 600 m"),
+                ("Horse Ranch", "T · 800 m")
+            ],
+            "mushola": [("Mushola dekat Entrance Gate", "B · 60 m")],
+            "fasilitas": [
+                ("Shuttle Car", "B · 50 m"),
                 ("Camping Ground", "B · 650 m"),
-                ("Horse Ranch", "T · 800 m"),
+                ("Teras Paphio", "T · 120 m"),
                 ("Toilet umum (Area Parkir A & B)", "B · 70 m"),
                 ("Souvenir Shop", "T · 110 m"),
                 ("Pos Informasi & P3K", "T · 100 m")
