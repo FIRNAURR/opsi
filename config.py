@@ -1,22 +1,9 @@
-"""
-config.py
-=========
-Konfigurasi terpusat untuk aplikasi RITAM — Evakuasi Cikole.
-
-Bertanggung jawab atas:
-  - Page config Streamlit (dipanggil sekali dari main.py)
-  - Path direktori aset
-  - Parameter jaringan/cache untuk pemanggilan OSRM
-  - Pemuatan kredensial admin murni dari st.secrets (TIDAK ADA
-    kredensial hardcoded di source code — lihat pilar Keamanan)
-"""
-
 import os
 import streamlit as st
 
 # ------------------------------------------------------------------
 # PATH & DIREKTORI
-# ------------------------------------------------------------------
+# ----------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
