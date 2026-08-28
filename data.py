@@ -55,7 +55,8 @@ SPOTS = [
             ],
         },
         "contact": {
-            "phone": "+62 811-2333-339",
+            "phone": "0811 222 1284",
+            "WA": "wa.me/6811 222 1284",
             "email": "orchidforestcikole.ofc@gmail.com",
             "facebook": "Orchid Forest Cikole",
             "facebook_url": "https://www.facebook.com/orchidforestcikole",
