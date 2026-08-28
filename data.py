@@ -35,20 +35,20 @@ SPOTS = [
                 ("Food Court & Food Corner", "T · 500 m", None)
             ],
             "layanan": [
+            ],
+            "mushola": [("Mushola dekat Entrance Gate", "B · 60 m")],
+            "fasilitas & Layanan": [
                 ("Shuttle Car", "B · 50 m"),
+                ("Putt Putt Golf", "T · 400 m"),
                 ("Teras Paphio", "T · 120 m"),
                 ("Orchid House & Greenhouse", "B · 250 m"),
                 ("Bazaar Anggrek", "T · 300 m"),
                 ("Garden of Light", "B · 350 m"),
-                ("Putt Putt Golf", "T · 400 m"),
                 ("Rabbit Forest & Pet Venture", "B · 450 m"),
                 ("Wood Bridge & Flying Fox", "B · 550 m"),
                 ("Orchid Castle", "T · 600 m"),
                 ("Camping Ground", "B · 650 m"),
                 ("Horse Ranch", "T · 800 m")
-            ],
-            "mushola": [("Mushola dekat Entrance Gate", "B · 60 m")],
-            "fasilitas": [
                 ("Toilet umum (Area Parkir A & B)", "B · 70 m"),
                 ("Souvenir Shop", "T · 110 m"),
                 ("Pos Informasi & P3K", "T · 100 m")
