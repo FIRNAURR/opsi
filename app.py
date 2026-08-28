@@ -1,9 +1,4 @@
-"""
-main.py
-=======
-Entry point aplikasi RITAM — Evakuasi & Direktori Kawasan Cikole.
-"""
-
+\
 from __future__ import annotations
 
 import copy
@@ -247,6 +242,13 @@ else:
 
     ui.render_detail_header(spot)
     st.write("")
+
+    if spot.get("name") == "Orchid Forest Cikole":
+        ui.render_map_card(
+            image_path="assets\\peta_wisata_orchid.jpg", 
+            title="Peta Wisata Orchid Forest",
+            desc="Lihat titik kumpul, fasilitas, dan rute di dalam area Orchid Forest. (Klik gambar untuk memperbesar)"
+    )
 
     if st.session_state.is_admin:
         tab_evac, tab_sop, tab_amen, tab_admin = st.tabs(["🧭 Evakuasi", "✅ SOP", "🍽️ Layanan", "⚙️ Admin"])
