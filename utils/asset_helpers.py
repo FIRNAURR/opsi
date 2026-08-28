@@ -1,11 +1,3 @@
-"""
-utils/asset_helpers.py
-=======================
-Util pemuatan aset statis (gambar) menjadi data URI base64, dengan
-cache agar file tidak dibaca ulang dari disk pada setiap rerun
-Streamlit (lihat pilar Optimasi Performa).
-"""
-
 import base64
 import os
 
