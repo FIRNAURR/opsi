@@ -1,12 +1,3 @@
-"""
-components/ui.py
-=================
-(Versi Mobile-Optimized & Responsive Fix)
-Seluruh elemen presentasi aplikasi: injeksi CSS global, kompas arah,
-kartu grid wisata, kartu amenitas/sosial media, topbar, dan form
-login admin.
-"""
-
 from __future__ import annotations
 
 import urllib.parse
@@ -519,6 +510,7 @@ def render_sop_steps() -> None:
     steps = [
         ("Lindungi diri", "Jauhi kaca, papan reklame, dan pohon/tebing tinggi. Lindungi kepala."),
         ("Tetap tenang", "Jangan berlari panik. Ikuti arah petunjuk staf & papan evakuasi."),
+        ("Bantu Kelompok Rentan", "Bantu lansia, anak-anak, dan penyandang disabilitas untuk evakuasi."),
         ("Menuju titik kumpul", "Bergerak ke titik kumpul terbuka sesuai arah pada tab Evakuasi."),
         ("Tunggu instruksi", "Tetap di titik kumpul hingga ada instruksi resmi dari petugas/BPBD."),
     ]
@@ -569,11 +561,16 @@ def render_amenity_card(title: str, items: list, kind: str) -> None:
     )
 
 def render_social_card(spot: dict) -> None:
-    if not spot["social"].get("instagram"):
+    # Safe lookup: gunakan key 'social' jika ada, fallback ke 'contact'
+    social_data = spot.get("social") or spot.get("contact", {})
+    
+    # Jika tidak ada data Instagram, hentikan eksekusi tanpa throw Error
+    if not social_data or not social_data.get("instagram"):
         return
+        
     name_q = urllib.parse.quote(spot["name"])
-    ig = spot["social"]["instagram"]
-    ig_url = spot["social"]["instagram_url"] or f"https://www.instagram.com/explore/tags/{name_q}/"
+    ig = social_data.get("instagram", "")
+    ig_url = social_data.get("instagram_url") or f"https://www.instagram.com/explore/tags/{name_q}/"
 
     st.markdown(
         f"""
@@ -597,5 +594,29 @@ def render_social_card(spot: dict) -> None:
         unsafe_allow_html=True,
     )
 
+def render_map_card(image_path: str, title: str = "Peta Kawasan Wisata", desc: str = "Panduan visual area dan rute evakuasi di dalam kawasan.") -> None:
+    # Render header/judul card
+    st.markdown(
+        f"""
+        <div class="ritam-card" style="margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none;">
+          <h4>🗺️ {title}</h4>
+          <div class="ritam-social-sub" style="margin-bottom: 8px;">{desc}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    # Render gambar (dibungkus dalam try-except agar tidak crash jika file gambar tidak ditemukan)
+    try:
+        # st.image otomatis memberikan fitur klik-untuk-perbesar (lightbox) pada gambar
+        st.image(image_path, use_container_width=True)
+        # Menutup styling bagian bawah agar rapi
+        st.markdown('<div style="margin-bottom: 16px;"></div>', unsafe_allow_html=True)
+    except Exception:
+        st.error("⚠️ File gambar peta tidak ditemukan. Pastikan file ada di path yang benar.")
+
 def render_footer(text: str) -> None:
-    st.markdown(f'<div class="ritam-footer">{text}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="ritam-footer">{text}</div>',
+        unsafe_allow_html=True,
+    )
