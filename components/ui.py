@@ -563,32 +563,66 @@ def render_amenity_card(title: str, items: list, kind: str) -> None:
 def render_social_card(spot: dict) -> None:
     # Safe lookup: gunakan key 'social' jika ada, fallback ke 'contact'
     social_data = spot.get("social") or spot.get("contact", {})
-    
-    # Jika tidak ada data Instagram, hentikan eksekusi tanpa throw Error
-    if not social_data or not social_data.get("instagram"):
+
+    ig = social_data.get("instagram")
+    wa = social_data.get("WA") or social_data.get("whatsapp")
+
+    # Tampilkan kartu jika minimal salah satu kontak tersedia
+    if not ig and not wa:
         return
-        
-    name_q = urllib.parse.quote(spot["name"])
-    ig = social_data.get("instagram", "")
-    ig_url = social_data.get("instagram_url") or f"https://www.instagram.com/explore/tags/{name_q}/"
+
+    spot_name = spot.get("name", "Lokasi")
+    name_q = urllib.parse.quote(spot_name)
+
+    # Elemen Instagram
+    ig_html = ""
+    if ig:
+        ig_url = (
+            social_data.get("instagram_url")
+            or f"https://www.instagram.com/explore/tags/{name_q}/"
+        )
+        ig_html = f"""
+        <a class="ritam-social-pill ig" href="{ig_url}" target="_blank" rel="noopener"
+           style="width:100%; display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; padding:12px 14px; text-decoration:none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0">
+            <rect x="3" y="3" width="18" height="18" rx="5.5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.3" cy="6.7" r="0.6" fill="currentColor" stroke="none"/>
+          </svg>
+          <span style="display:flex; flex-direction:column; align-items:flex-start; gap:1px;">
+            <span style="font-size:12.5px; font-weight:600;">Instagram</span>
+            <span class="handle">{ig}</span>
+          </span>
+        </a>
+        """
+
+    # Elemen WhatsApp
+    wa_html = ""
+    if wa:
+        clean_wa = "".join(filter(str.isdigit, str(wa)))
+        wa_url = f"https://wa.me/{clean_wa}" if clean_wa else "#"
+        wa_html = f"""
+        <a class="ritam-social-pill wa" href="{wa_url}" target="_blank" rel="noopener"
+           style="width:100%; display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:10px; padding:12px 14px; text-decoration:none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+          <span style="display:flex; flex-direction:column; align-items:flex-start; gap:1px;">
+            <span style="font-size:12.5px; font-weight:600;">WhatsApp</span>
+            <span class="handle">{wa}</span>
+          </span>
+        </a>
+        """
 
     st.markdown(
         f"""
         <div class="ritam-card">
           <h4>📣 Info & Promo Terbaru</h4>
-          <div class="ritam-social-sub">Follow Instagram resmi untuk update promo tiket dan wahana di {spot['name']}.</div>
-          <a class="ritam-social-pill ig" href="{ig_url}" target="_blank" rel="noopener"
-             style="width:100%; flex-direction:row; justify-content:flex-start; gap:10px; padding:12px 14px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0">
-              <rect x="3" y="3" width="18" height="18" rx="5.5"/>
-              <circle cx="12" cy="12" r="4"/>
-              <circle cx="17.3" cy="6.7" r="0.6" fill="currentColor" stroke="none"/>
-            </svg>
-            <span style="display:flex; flex-direction:column; align-items:flex-start; gap:1px;">
-              <span style="font-size:12.5px; font-weight:600;">Instagram</span>
-              <span class="handle">{ig}</span>
-            </span>
-          </a>
+          <div class="ritam-social-sub">Follow atau hubungi kontak resmi untuk update promo di {spot_name}.</div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+            {ig_html}
+            {wa_html}
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
