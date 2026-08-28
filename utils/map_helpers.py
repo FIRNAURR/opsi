@@ -1,10 +1,3 @@
-"""
-utils/map_helpers.py
-=====================
-Logika geospasial aplikasi: pembuatan peta Folium, pemanggilan API
-OSRM untuk rute pejalan kaki, parsing instruksi navigasi, dan arah kompas.
-"""
-
 import math
 import folium
 import requests
