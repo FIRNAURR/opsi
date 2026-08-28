@@ -45,7 +45,7 @@ SPOTS = [
                 ("Wood Bridge & Flying Fox", "B · 550 m"),
                 ("Orchid Castle", "T · 600 m"),
                 ("Camping Ground", "B · 650 m"),
-                ("Horse Ranch", "T · 800 m")
+                ("Horse Ranch", "T · 800 m"),
                 ("Toilet umum (Area Parkir A & B)", "B · 70 m"),
                 ("Souvenir Shop", "T · 110 m"),
                 ("Pos Informasi & P3K", "T · 100 m")
