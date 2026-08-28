@@ -10,12 +10,15 @@ import config
 from data import SPOTS, SPOTS_BY_ID, TYPE_LABELS
 from utils.map_helpers import bearing_to_label, compute_bearing, generate_evac_map_and_instructions
 from components import ui
+from pathlib import Path
 
 # ------------------------------------------------------------------
 # 1. PAGE CONFIG — harus jadi perintah Streamlit pertama
 # ------------------------------------------------------------------
 config.configure_page()
 
+BASE_DIR = Path(__file__).resolve().parent
+MAP_IMAGE_PATH = BASE_DIR / "assets" / "peta_wisata_orchid.jpg"
 # ------------------------------------------------------------------
 # 2. STATE MANAGEMENT
 # ------------------------------------------------------------------
@@ -77,6 +80,17 @@ def _unique_id(base_slug: str, existing_ids: set) -> str:
         candidate = f"{base_slug}-{i}"
         i += 1
     return candidate
+
+def load_map_image(image_path: Path):
+    """Pemuatan gambar aman dengan verifikasi ketersediaan file."""
+    if not image_path.exists():
+        st.warning(
+            f"⚠️ File gambar peta tidak ditemukan di: `{image_path.name}`. "
+            "Pastikan file berada di dalam folder yang sesuai."
+        )
+        return None
+    return str(image_path)
+
 
 _init_session_state()
 spots = st.session_state.spots
@@ -243,11 +257,9 @@ else:
     st.write("")
 
     if spot.get("name") == "Orchid Forest Cikole":
-        ui.render_map_card(
-            image_path="assets" / "peta_wisata_orchid.jpg", 
-            title="Peta Wisata Orchid Forest",
-            desc="Lihat titik kumpul, fasilitas, dan rute di dalam area Orchid Forest. (Klik gambar untuk memperbesar)"
-    )
+        img_path = load_map_image(MAP_IMAGE_PATH)
+        if img_path:
+            st.image(img_path, caption="Peta Wisata Orchid Forest Cikole", use_container_width=True)
 
     if st.session_state.is_admin:
         tab_evac, tab_sop, tab_amen, tab_admin = st.tabs(["🧭 Evakuasi", "✅ SOP", "🍽️ Layanan", "⚙️ Admin"])
