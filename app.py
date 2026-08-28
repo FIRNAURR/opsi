@@ -244,7 +244,7 @@ else:
 
     if spot.get("name") == "Orchid Forest Cikole":
         ui.render_map_card(
-            image_path="assets\\peta_wisata_orchid.jpg", 
+            image_path="assets" / "peta_wisata_orchid.jpg", 
             title="Peta Wisata Orchid Forest",
             desc="Lihat titik kumpul, fasilitas, dan rute di dalam area Orchid Forest. (Klik gambar untuk memperbesar)"
     )
